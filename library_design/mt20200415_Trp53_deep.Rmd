@@ -197,7 +197,7 @@ get_pwm_feature_matrix <- function(motif_meta_fn, fimo_fn, db = 2) {
 ## Data import
 ```{r}
 # Import chosen TFs
-motifs <- read.csv2("/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/trp53_model/parameter_files/TF_motifs.csv", header = T)
+motifs <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/TF_motifs.csv", header = T)
 ```
 
 
@@ -207,7 +207,7 @@ motifs <- read.csv2("/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/
 # barc <- create.dnabarcodes(n = 12, dist = 3, filter.triplets = T, metric = "seqlev",
 #                            filter.gc = T, filter.self_complementary = T, cores = 24)
 
-barc <- read.csv("/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/trp53_model/barc.csv") %>%
+barc <- read.csv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/barc.csv") %>%
   select(x) %>% setnames("x","barcode")
 
 # Filter out ATGs
@@ -443,7 +443,7 @@ control.df <- unique(control.df[control.df$affinity_pos1 == "0" & control.df$aff
 control.df <- control.df[control.df$background == 1,]
 control.df <- control.df[grep(paste(c(1,2,3,4), collapse = "|"), control.df$oligo.barcode),]
 
-control.motifs <- read.csv2("/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/trp53_model/parameter_files/TF_motifs_ctrl.csv", header = T)
+control.motifs <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/TF_motifs_ctrl.csv", header = T)
 control.motifs <- merge(control.motifs, control.df)
 
 tf.df <- rbind(tf.df, control.motifs)
@@ -508,7 +508,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
 tib_pwm_10bp_space_new  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
-                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/spacing_new/fimo.tsv',
+                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/output/spacing_new/fimo.tsv',
                                         db            = 2)
 ```
 
@@ -613,7 +613,7 @@ spacers$seq.name <- paste(spacers$seq.name, spacers$tf, sep = "_")
 # Write fasta file to run on FIMO script
 spacers_export <- spacers
 spacers_export <- spacers_export %>% select(seq.name, seq.text) %>% unique()
-dat2fasta(spacers_export, outfile = "/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/trp53_model/fimo/spacing_new_trunc.fasta")     
+#dat2fasta(spacers_export, outfile = "/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/trp53_model/fimo/spacing_new_trunc.fasta")     
 ```
 
 ## Run FIMO script again 
@@ -632,7 +632,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
 tib_pwm_10bp_space_new_trunc  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
-                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/spacing_new_trunc_2/fimo.tsv',
+                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/output/spacing_new_trunc_2/fimo.tsv',
                                         db            = 2)
 ```
 
@@ -768,7 +768,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
 tib_pwm_10bp_dist_new  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
-                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/distance_new/fimo.tsv',
+                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/output/distance_new/fimo.tsv',
                                         db            = 2)
 ```
 
@@ -907,7 +907,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
 tib_pwm_position  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
-                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/position/fimo.tsv',
+                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/output/position/fimo.tsv',
                                         db            = 2)
 ```
 
@@ -1137,7 +1137,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
 tib_pwm_position_connell  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
-                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/position_connell/fimo.tsv',
+                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/output/position_connell/fimo.tsv',
                                         db            = 2)
 ```
 
@@ -1253,7 +1253,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
 tib_pwm_tf_check  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
-                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/reporter_check/fimo.tsv',
+                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/output/reporter_check/fimo.tsv',
                                         db            = 2)
 ```
 
@@ -1411,11 +1411,11 @@ paste("duplicate sequences: ", nrow(tf.df.export[duplicated(tf.df.export$seq.tex
 filename <- SetFileName("_oligo_pool_deep", "mt")
 
 # Write csv file
-setwd("/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/trp53_model/output/")
+setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/output/")
 write.csv(tf.df.export, file = paste(filename,".csv", sep = ""), row.names = F)
 
 # Write fasta file
-setwd("/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/trp53_model/output/")
+setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/output/")
 dat2fasta(tf.df.export, outfile = paste(filename,".fasta", sep = ""))  
 
 ```
