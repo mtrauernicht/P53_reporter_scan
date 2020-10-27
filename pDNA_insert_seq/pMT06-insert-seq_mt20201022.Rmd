@@ -211,7 +211,7 @@ ref_seq$barcode <- gsub(".*([A-Z]{12})$", "\\1", ref_seq$sequence)
 ref_seq$insert <- gsub("(.*)[A-Z]{12}$", "\\1", ref_seq$sequence)
 
 # Import sequencing files
-pDNA_seq <- read.delim2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/pDNA_insert_seq/processed/pDNA-seq-counts.txt", col.names = c("sequence", "number"))
+pDNA_seq <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/pDNA_insert_seq/processed/6185_1_pMT06_insert_counts.tsv", col_names = c("sequence", "number"))
 
 # Split up in insert and barcode part
 ## In my case, the barcode should be the last 12 bases of the sequence
@@ -242,22 +242,13 @@ ggplot(match_bc, aes(x = TF, y = number)) +
   ylim(0,1000)
 ```
 
-## Filter out low & noisy barcode reads
-```{r}
-# Filter pDNA data - we should have at least 25 pDNA counts - we want to be sure that we're looking at relevant things
-pDNA_seq <- pDNA_seq[pDNA_seq$number >= 25,]
-
-
-ggplot(match_bc, aes(x = TF, y = number)) +
-  geom_quasirandom(alpha = 0.1) +
-  theme_bw() +
-  ylim(0,1000)
-```
-
 
 
 ## Plot how many barcodes are found in pDNA data
 ```{r, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
+# Filter pDNA data - we should have at least 25 pDNA counts - we want to be sure that we're looking at relevant things
+pDNA_seq <- pDNA_seq[pDNA_seq$number >= 50,]
+
 # Match barcodes with original data
 ref_seq_bc <- ref_seq %>% select(name, barcode)
 pDNA_seq_bc <- pDNA_seq %>% select(barcode) %>% unique() %>% mutate(id = "pDNA")
@@ -525,8 +516,8 @@ matching_df$mismatch[is.na(matching_df$mismatch)] <- 0.1
 # Calculate match/mismatch ratio
 matching_df$ratio <- matching_df$match / matching_df$mismatch
 matching_df$type <- "good matching"
-matching_df$type[log2(matching_df$ratio) < 2 & log2(matching_df$ratio) >= -2] <- "unclear matching"
-matching_df$type[log2(matching_df$ratio) < -2] <- "incorrect matching"
+matching_df$type[log2(matching_df$ratio) < 5 & log2(matching_df$ratio) >= -5] <- "unclear matching"
+matching_df$type[log2(matching_df$ratio) < -5] <- "incorrect matching"
 
 # Plot match/mismatch distribution
 ggplot(matching_df, 
