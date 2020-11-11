@@ -199,7 +199,7 @@ get_pwm_feature_matrix <- function(motif_meta_fn, fimo_fn, db = 2) {
 ## Data import
 ```{r, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
 # Import reference sequences
-ref_seq <- ReadFasta("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/output/mt20200619_oligo_pool_deep.fasta")
+ref_seq <- ReadFasta("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/mt20200619_oligo_pool_deep.fasta")
 
 # Remove adapters from reference sequence (cause these are not in the sequencing data)
 ref_seq$sequence <- gsub("CGGAGCGAACCGAGTTAG", "", ref_seq$sequence)
@@ -217,6 +217,9 @@ pDNA_seq <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/d
 ## In my case, the barcode should be the last 12 bases of the sequence
 pDNA_seq$barcode <- gsub(".*([A-Z]{12})$", "\\1", pDNA_seq$sequence)
 pDNA_seq$insert <- gsub("(.*)[A-Z]{12}$", "\\1", pDNA_seq$sequence)
+
+# Calculate reads per million
+pDNA_seq$rpm <- ave(pDNA_seq$number, FUN = function(x) x/sum(x) *1e6)
 ```
 
 # Analysis
@@ -224,33 +227,65 @@ pDNA_seq$insert <- gsub("(.*)[A-Z]{12}$", "\\1", pDNA_seq$sequence)
 ## What is the barcode distribution of mapped vs. unmapped for both TFs?
 ```{r, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
 # Match barcodes with original data
-pDNA_seq_bc <- pDNA_seq %>% select(barcode, number) %>% unique() %>% mutate(id = "pDNA")
+pDNA_seq_bc <- pDNA_seq %>% select(barcode, rpm) %>% unique() %>% mutate(id = "pDNA")
 # Only keep highest barcode values - a bit of cheating here
-pDNA_seq_bc <- pDNA_seq_bc[order(pDNA_seq_bc$barcode, -abs(pDNA_seq_bc$number) ), ]
+pDNA_seq_bc <- pDNA_seq_bc[order(pDNA_seq_bc$barcode, -abs(pDNA_seq_bc$rpm) ), ]
 pDNA_seq_bc <- pDNA_seq_bc[ !duplicated(pDNA_seq_bc$barcode), ] 
+ref_seq_bc <- ref_seq %>% select(name, barcode)
 match_bc <- merge(ref_seq_bc, pDNA_seq_bc, by = "barcode", all = T)
-match_bc <- match_bc[!is.na(match_bc$number),]
+match_bc <- match_bc[!is.na(match_bc$rpm),]
 match_bc$TF <- gsub("_.*", "\\1", match_bc$name)
 match_bc$match <- "true"
 match_bc$match[is.na(match_bc$name)] <- "false"
+match_bc$conf <- "high"
+match_bc$conf[match_bc$rpm < 10] <- "low"
 
 # Visualize
-ggplot(match_bc, aes(x = TF, y = number)) +
-  geom_quasirandom(alpha = 0.1) +
+ggplot(match_bc, aes(x = TF, y = rpm)) +
+  geom_quasirandom() +
   theme_bw() +
-  geom_hline(yintercept = 25, linetype = "dotted", color = "red") +
-  ylim(0,1000)
+  xlab("reporter matches to:") +
+  ylab("reads per million") +
+  theme(text = element_text(size = 14)) +
+  ylim(0,300)
 ```
 
+## Correlate to GC contenct
+```{r}
+# Load reference file
+ref_seq_2 <- seqinr::read.fasta("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr//data/library_design/output/mt20200619_oligo_pool_deep.fasta")
 
+# Compute gc contents
+gc <- compute_GC(ref_seq_2)
+
+# Plot gc distribution
+density <- density(gc$GC.content)
+
+plot_ly(x = ~density$x, y = ~density$y, type = 'scatter', mode = 'lines', fill = 'tozeroy') %>% 
+  layout(xaxis = list(title = 'GC content'),
+         yaxis = list(title = 'Density'))
+
+match_seq <- match_bc[!is.na(match_bc$name),]
+gc <- gc %>% rownames_to_column(var = "name")
+gc <- merge(gc, match_seq)
+
+
+plot_ly(data = gc, x = ~GC.content, y = ~rpm, color = ifelse(gc$rpm >= 10, "black", "red")) %>% 
+  layout(xaxis = list(title = 'GC content'),
+         yaxis = list(title = 'reads per million',
+                      range=c(0,230)))
+
+```
 
 ## Plot how many barcodes are found in pDNA data
 ```{r, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
-# Filter pDNA data - we should have at least 25 pDNA counts - we want to be sure that we're looking at relevant things
-pDNA_seq <- pDNA_seq[pDNA_seq$number >= 50,]
+# Filter pDNA data - we should have at least 10 rpm - we want to be sure that we're looking at relevant things
+pDNA_seq <- pDNA_seq[pDNA_seq$rpm >= 1,]
 
 # Match barcodes with original data
 ref_seq_bc <- ref_seq %>% select(name, barcode)
+ref_seq_bc$TF <- gsub("_.*", "\\1", ref_seq_bc$name)
+ref_seq_bc <- ref_seq_bc[ref_seq_bc$TF == "Gr",]
 pDNA_seq_bc <- pDNA_seq %>% select(barcode) %>% unique() %>% mutate(id = "pDNA")
 match_bc <- merge(ref_seq_bc, pDNA_seq_bc, by = "barcode", all = T)
 
@@ -293,7 +328,6 @@ ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=lbls)) +
   geom_text(x=2, aes(y=labelPosition, label=label, color=lbls), size=5) + # x here controls label position (inner / outer)
   scale_fill_manual(values = c("#1B998B", "#2D3047")) +
   scale_color_manual(values = c("#1B998B", "#2D3047")) +
-  labs(title = "percentage of barcodes found back in pDNA-seq") +
   coord_polar(theta="y") +
   xlim(c(0, 4)) +
   theme_void() +
@@ -301,18 +335,22 @@ ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=lbls)) +
 ```
 
 
-
-## How many raw complete sequences match with the design?
+## Plot how many reads match to designed barcodes
 ```{r, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
 # Match barcodes with original data
-ref_seq_seq <- ref_seq %>% select(name, sequence)
-pDNA_seq_seq <- pDNA_seq %>% select(sequence) %>% unique() %>% mutate(id = "pDNA")
-match_seq <- merge(ref_seq_seq, pDNA_seq_seq, by = "sequence", all = T)
+pDNA_seq_bc <- pDNA_seq %>% select(barcode, number) %>% unique() %>% mutate(id = "pDNA")
+ref_seq_bc <- ref_seq %>% select(name, barcode)
+ref_seq_bc$TF <- gsub("_.*", "\\1", ref_seq_bc$name)
+match_bc <- merge(ref_seq_bc, pDNA_seq_bc, by = "barcode", all = T)
 
 ## Identify the unmapped fraction
-match_df_ref_seq <- match_seq[!is.na(match_seq$name),]
-n_match <- nrow(match_df_ref_seq[!is.na(match_df_ref_seq$id),])
-n_nomatch <- nrow(match_df_ref_seq[is.na(match_df_ref_seq$id),])
+match_df_ref <- match_bc
+match_df_ref$number[is.na(match_df_ref$number)] <- 0
+match_df_ref$TF[is.na(match_df_ref$TF)] <- "no-match"
+match_df_ref <- match_df_ref[match_df_ref$TF != "Trp53",]
+n_match <- sum(match_df_ref$number[match_df_ref$TF == "Gr"])
+n_nomatch <- sum(match_df_ref$number[match_df_ref$TF == "no-match"])
+
 
 # Create donut chart
 data <- data.frame(
@@ -347,12 +385,67 @@ ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=lbls)) +
   geom_text(x=2, aes(y=labelPosition, label=label, color=lbls), size=5) + # x here controls label position (inner / outer)
   scale_fill_manual(values = c("#1B998B", "#2D3047")) +
   scale_color_manual(values = c("#1B998B", "#2D3047")) +
-  labs(title = "percentage of inserts found back in pDNA-seq") +
   coord_polar(theta="y") +
   xlim(c(0, 4)) +
   theme_void() +
   theme(legend.position = "none")
 ```
+
+
+## How many raw complete sequences match with the design?
+```{r, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
+# Match barcodes with original data
+ref_seq_seq <- ref_seq %>% select(name, sequence)
+pDNA_seq_seq <- pDNA_seq %>% select(sequence) %>% unique() %>% mutate(id = "pDNA")
+match_seq <- merge(ref_seq_seq, pDNA_seq_seq, by = "sequence", all = T)
+match_seq$TF <- gsub("_.*", "\\1", match_seq$name)
+match_seq$TF[is.na(match_seq$TF)] <- "no-match"
+match_seq <- match_seq[match_seq$TF != "Trp53",]
+
+## Identify the unmapped fraction
+match_df_ref_seq <- match_seq[!is.na(match_seq$name),]
+n_match <- nrow(match_df_ref_seq[match_df_ref_seq$TF == "Gr",])
+n_nomatch <- nrow(match_df_ref_seq[match_df_ref_seq$TF == "no-match",])
+
+# Create donut chart
+data <- data.frame(
+  lbls=c("matched:", "unmatched:"),
+  count=c(n_match, n_nomatch)
+)
+ 
+# Compute percentages
+data$fraction <- data$count / sum(data$count)
+data$percentage <- data$fraction * 100
+
+
+# Compute the cumulative percentages (top of each rectangle)
+data$ymax <- cumsum(data$fraction)
+
+
+# Compute the cumulative percentages (top of each rectangle)
+data$ymax <- cumsum(data$fraction)
+
+# Compute the bottom of each rectangle
+data$ymin <- c(0, head(data$ymax, n=-1))
+
+# Compute label position
+data$labelPosition <- (data$ymax + data$ymin) / 2
+
+# Compute a good label
+data$label <- paste0(data$lbls, "\n", round(data$percentage), "%")
+
+# Make the plot
+ggplot(data, aes(ymax=ymax, ymin=ymin, xmax=4, xmin=3, fill=lbls)) +
+  geom_rect() +
+  geom_text(x=2, aes(y=labelPosition, label=label, color=lbls), size=5) + # x here controls label position (inner / outer)
+  scale_fill_manual(values = c("#1B998B", "#2D3047")) +
+  scale_color_manual(values = c("#1B998B", "#2D3047")) +
+  coord_polar(theta="y") +
+  xlim(c(0, 4)) +
+  theme_void() +
+  theme(legend.position = "none")
+```
+
 
 
 
@@ -374,8 +467,10 @@ ggplot(match_insert, aes(x = TF, y = number)) +
 
 ## Identify the unmapped fraction
 match_df_reads <- match_insert[!is.na(match_insert$number),]
-n_match <- sum(match_df_reads$number[!is.na(match_df_reads$name)])
-n_nomatch <- sum(match_df_reads$number[is.na(match_df_reads$name)])
+match_df_reads$TF[is.na(match_df_reads$TF)] <- "no-match"
+n_match <- sum(match_df_reads$number[match_df_reads$TF == "Trp53"])
+n_match <- sum(match_df_reads$number[match_df_reads$TF == "Gr"])
+n_nomatch <- sum(match_df_reads$number[match_df_reads$TF == "no-match"])
 
 # Create donut chart
 data <- data.frame(
@@ -441,8 +536,8 @@ for (i in 1:nrow(pDNA_seq_insert)) {
 }
 
 
-
-
+pDNA_seq_insert$TF <- gsub("_.*", "\\1", pDNA_seq_insert$`insert-match`)
+pDNA_seq_insert <- pDNA_seq_insert[pDNA_seq_insert$TF == "Gr",]
 
 ## Identify the unmapped fraction
 n_match <- sum(pDNA_seq_insert$number[pDNA_seq_insert$match == T])
