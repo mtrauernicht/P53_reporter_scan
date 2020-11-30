@@ -1,10 +1,11 @@
 ---
-title: "Barcode processing"
+title: "Barcode processing - Deep P53/GR scan - stimulation 1"
 author: "Max Trauernicht"
 date: "`r format(Sys.time(), '%Y-%m-%d')`"
 output: 
   prettydoc::html_pretty:
     theme: leonids
+    runtime: shiny
     highlight: github
   #   toc: true
   #   toc_float: true
@@ -13,16 +14,14 @@ output:
   #   chunk_output_type: console
 ---
 
-# knitr document van Steensel lab
+*knitr document van Steensel lab*
 
-# TF reporter barcode processing
+# TF reporter barcode processing - Deep P53/GR scan - stimulation 1
 
-# Introduction
+## Introduction
 18,000 TF reporters on pMT02 were transfected into mESCs, U2OS & A549, sequencing data yielded barcode counts of these experiments. These counts will be processed in this script. 
 
-# Data processing
-## Path, Libraries, Parameters and Useful Functions
-```{r setup, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+```{r setup, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 StartTime <-Sys.time()
 
@@ -45,11 +44,14 @@ library(parallel)
 library(RColorBrewer)
 library(gridExtra)
 library(pheatmap)
+library(shiny)
+library(factoextra)
+library(ggbiplot)
 ```
 
-### Custom functions
-Functions used thoughout this script.
-```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+#Custom functions
 SetFileName <- function(filename, initials) {
   # Set filename with extension and initials to make filename with date integrated.
   filename <- substitute(filename)
@@ -103,8 +105,7 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 ```
 
 
-## Data import
-```{r data import, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+```{r data import, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Import barcode counts per experiment
 bc_files = list.files('/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results/',
                        full.names=T, patter='*_barcode_counts.tsv')
@@ -121,10 +122,8 @@ bc_annotation <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp5
   setnames("seq.name", "reporter_id")
 ```
 
-# Analysis
-
-## Write bc-counts into a long df
-```{r cluster_compare, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+## Analysis
+```{r cluster_compare, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Generate long dfs
 for (i in 1:length(bc_list)) {
   if (i == 1) {
@@ -145,6 +144,7 @@ for (i in 1:length(bc_list)) {
 # NAs to 0
 bc_df[is.na(bc_df)] <- 0
 
+
 # Convert to long df
 bc_df <- melt(bc_df, id.vars = "barcode",
               variable.name = "condition", value.name = "starcode_counts", as.is = T)
@@ -158,8 +158,8 @@ bc_df$condition <- gsub("_pMT06", "", bc_df$condition)
 ```
 
 
-## Data exploration
-```{r data inspection, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+### Data exploration
+```{r data inspection, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # First compute reads per million to estimate the relative counts in their respective sample
 for (i in unique(bc_df$condition)) {
   bc_df$rpm[bc_df$condition == i] <- bc_df$starcode_counts[bc_df$condition == i] + 1/ # Adds a pseudocount of 1
@@ -196,7 +196,7 @@ ggplot(bc_df[bc_df$rpm >= 500 & !is.na(bc_df$tf),], aes(x = rpm)) +
   theme(strip.background =element_rect(fill="#D6D5C9"))
 
 n_highly_expressed <- data.frame("condition" = unique(bc_df$condition),
-                                 "n_bc" = "")
+                                 "n_bc" = "", stringsAsFactors=FALSE)
 for (i in unique(bc_df$condition)) {
   n_highly_expressed$n_bc[n_highly_expressed$condition == i] <- length(bc_df$barcode[bc_df$rpm > 500 & bc_df$condition == i])
 }
@@ -212,8 +212,8 @@ plot_ly(n_highly_expressed, x = ~condition, y = ~as.numeric(n_bc), type = 'bar',
 ## 2: How many barcodes can I find back at which cutoff? + What is the percentage of barcode reads that match the design at which cutoff?
 ## Identify the unmapped fraction
 bc_fraction <- data.frame("condition" = unique(bc_df$condition),
-                          "bcs_found" = "")
-rpm_cutoff <- data.frame("cutoff" = seq(0.0001,15,0.5))
+                          "bcs_found" = "", stringsAsFactors=FALSE)
+rpm_cutoff <- data.frame("cutoff" = seq(0.0001,15,0.5), stringsAsFactors=FALSE)
 bc_fraction <- merge(bc_fraction, rpm_cutoff)
 
 for (i in unique(bc_fraction$cutoff)) {
@@ -228,7 +228,7 @@ for (i in unique(bc_fraction$cutoff)) {
 
 ## How many reads match to designed barcodes?
 bc_reads <- data.frame("condition" = unique(bc_df$condition),
-                          "bc_reads" = "")
+                          "bc_reads" = "", stringsAsFactors=FALSE)
 bc_reads <- merge(bc_reads, rpm_cutoff)
 
 for (i in unique(bc_reads$cutoff)) {
@@ -258,17 +258,17 @@ ggplot(bc_fraction) +
 
 ## 3: What is the correlation of the 24 cDNA bc counts with the pDNA bc counts? 
 pDNA <- data.frame("pDNA" = bc_df$rpm[bc_df$condition == "pMT06_pDNA_rep1"],
-                   "barcode"= bc_df$barcode[bc_df$condition == "pMT06_pDNA_rep1"])
+                   "barcode"= bc_df$barcode[bc_df$condition == "pMT06_pDNA_rep1"], stringsAsFactors=FALSE)
 bc_df_2 <- merge(pDNA, bc_df, all = T)
 
 ggplot(bc_df_2, aes(x = pDNA, y = rpm)) +
   geom_bin2d(bins = 100)+
-  xlim(0,400) +
-  ylim(0,400)+
+  xlim(0,1000) +
+  ylim(0,1000)+
   theme_bw()+
   facet_wrap(~condition)
 
-cor <- data.frame("condition" = unique(bc_df_2$condition), "cor" = "")
+cor <- data.frame("condition" = unique(bc_df_2$condition), "cor" = "", stringsAsFactors=FALSE)
 
 for (i in unique(bc_df_2$condition)) {
   x <- bc_df_2$rpm[bc_df_2$condition == i]
@@ -341,10 +341,10 @@ ggscatter(bc_df_rep, x = "rep3", y = "rep2",
 
 ## 5: What is the correlation of the pDNA bc counts with the pDNA bc counts from the insert-seq?
 ### Highligh matched vs. unmatched with color
-pDNA_insert_counts <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/pDNA_insert_seq/bc_counts.csv") %>% select(-X)
+pDNA_insert_counts <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/pDNA_insert_seq/bc_counts.csv", stringsAsFactors = F) %>% select(-X)
 pDNA <- data.frame("pDNA" = bc_df$rpm[bc_df$condition == "pMT06_pDNA_rep1"],
                    "barcode"= bc_df$barcode[bc_df$condition == "pMT06_pDNA_rep1"],
-                   "tf" = bc_df$tf[bc_df$condition == "pMT06_pDNA_rep1"])
+                   "tf" = bc_df$tf[bc_df$condition == "pMT06_pDNA_rep1"], stringsAsFactors=FALSE)
 pDNA <- merge(pDNA, pDNA_insert_counts, all = T)
 pDNA$pDNA[is.na(pDNA$pDNA)] <- 0
 pDNA$rpm[is.na(pDNA$rpm)] <- 0
@@ -367,7 +367,7 @@ pDNA_fraction <- pDNA_fraction %>%
   mutate(pDNA = (pMT06_pDNA_rep1 + pMT06_pDNA_rep2) / 2) %>%
   select(-pMT06_pDNA_rep1, -pMT06_pDNA_rep2)
 pDNA_fr <- data.frame("cutoff" = seq(0,100, 1),
-                      "bcs_missing" = "")
+                      "bcs_missing" = "", stringsAsFactors=FALSE)
 for (i in pDNA_fr$cutoff) {
   pDNA_fr$bcs_missing[pDNA_fr$cutoff == i] <- length(pDNA_fraction$barcode) -
     length(pDNA_fraction$barcode[pDNA_fraction$pDNA >= i])
@@ -381,20 +381,21 @@ ggplot(pDNA_fr) +
   ylab("barcodes excluded from analysis (12,000 in total)") +
   geom_vline(xintercept = 30, linetype = "dashed", color = "black")
 ```
-## Stuff learned from above figures:
-1: Most samples have high matched read counts, but some seem to have lower counts:
-**High unmatched counts**:
-- A549_Dex-100_rep1/3
-**Low matched counts**:
-- MCF7-KO_DMSO_rep1/2
-- MCF7-KO_Nutlin_rep2/3 (maybe also 1)
+**Stuff learned from above figures:**  
+
+1: Most samples have high matched read counts, but some seem to have lower counts:  
+**High unmatched counts**:  
+- A549_Dex-100_rep1/3  
+**Low matched counts**:  
+- MCF7-KO_DMSO_rep1/2  
+- MCF7-KO_Nutlin_rep2/3 (maybe also 1)  
 - MCF7-WT_DMSO_rep2/3 
 - MCF7-WT_Nutlin_rep3 
-- mES_N2B27-HQ_rep1 (maybe also 2)
-- mES_N2B27-RA_rep1/2
--> Remove everything with less than 1700 matched barcodes with more than 500 rpm's
+- mES_N2B27-HQ_rep1 (maybe also 2)  
+- mES_N2B27-RA_rep1/2  
+-> Remove everything with less than 1700 matched barcodes with more than 500 rpm's  
 
-2: Samples with high counts usually also have a high matched barcode percentage.
+2: Samples with high counts usually also have a high matched barcode percentage.  
 
 3: Barcode counts diverge from pDNA data for almost all samples (except MCF7-WT-DMSO-rep2, and maybe mES_N2B27-RA_rep3) - with this we can exclude that we mainly sequenced barcode from pDNA.
 
@@ -402,8 +403,7 @@ ggplot(pDNA_fr) +
 
 -> Based on these figures I will exclude all samples that have less than 1700 barcodes with at least 500 normalized counts.
 
-# Filtering data
-```{r}
+```{r filtering, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Remove samples with low dynamic range
 for (i in unique(bc_df$condition)) {
   bc_df$n_bc[bc_df$condition == i] <- length(bc_df$barcode[bc_df$rpm > 500 & bc_df$condition == i])
@@ -421,9 +421,9 @@ bc_df <- bc_df[!is.na(bc_df$tf),]
 
 
 
-## Normalization of barcode counts:
+### Normalization of barcode counts:
 Divide cDNA barcode counts through pDNA barcode counts, if more than 30 pDNA counts for that barcode
-```{r normalization, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+```{r normalization, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Normalize data using pDNA data
 ## Compute activity by dividing through pDNA data
  n <- 0
@@ -455,13 +455,7 @@ Divide cDNA barcode counts through pDNA barcode counts, if more than 30 pDNA cou
 ```
 
 
-
-
-
-
-
-## Calculate mean activity - filter out outlier barcodes 
-```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # First identify and remove outlier barcodes - this removes the noise created by faulty barcode clustering etc. 
 ## Calculate mean and SD for each reporter
 bc_df_cDNA <- bc_df[-grep("pDNA", bc_df$condition),]
@@ -492,11 +486,7 @@ bc_df_cDNA_filt$reporter_activity_sd <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA
 
 
 
-
-
-## Filter out data using pDNA-insert-seq data
-## pDNA data seems ambigous - data doesn't match sometimes - exclude for now
-```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE}
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE}
 # # Remove barcodes with multiple inserts attached
 # bc_exclude <- read.csv("/DATA/usr/m.trauernicht/projects/tf_activity_reporter/data/SuRE_TF_1/pDNA_seq/bc_exclude.csv") %>% select(-X) %>% setnames("x", "barcode")
 # exclude <- bc_df_cDNA_filt[!bc_df_cDNA_filt$barcode %in% bc_exclude$barcode,]
@@ -543,9 +533,7 @@ bc_df_cDNA_filt$reporter_activity_sd <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA
 
 
 
-
-## Add pDNA data
-```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 pDNA <- bc_df[grep("pMT06_pDNA_rep1", bc_df$condition),] %>% 
   select(barcode, rpm) %>% unique() %>%
   setnames("rpm", "pDNA_counts_rpm") %>%
@@ -557,9 +545,7 @@ bc_df_cDNA_filt <- merge(pDNA, bc_df_cDNA_filt, all = T)
 
 
 
-
-## Annotate controls
-```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Annotate the mutated motif of each TF
 bc_df_cDNA_filt$neg_ctrls <- "No"
 bc_df_cDNA_filt$neg_ctrls[grep("random", bc_df_cDNA_filt$tf)] <- "Yes"
@@ -570,8 +556,9 @@ bc_df_cDNA_filt$rand_promoter[grep("random", bc_df_cDNA_filt$promoter)] <- "Yes"
 ```
 
 
+
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 ## Scale data to 1, use negative controls as reference
-```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 mean_neg_ctrl <- mean(bc_df_cDNA_filt$activity[bc_df_cDNA_filt$neg_ctrls == "Yes"])
 bc_df_cDNA_filt$activity <- bc_df_cDNA_filt$activity / mean_neg_ctrl
 bc_df_cDNA_filt$mean_activity <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA_filt$reporter_id, 
@@ -581,8 +568,8 @@ bc_df_cDNA_filt$mean_activity <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA_filt$r
 
 
 
-## Calculate correlations between technical replicates
-```{r correlations_2, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+### Calculate correlations between technical replicates
+```{r correlations_2, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 ## Combine replicates in 8 different columns
 bc_df_rep <- bc_df_cDNA_filt[bc_df_cDNA_filt$rand_promoter == "No",] %>% 
   select(oligo.barcode, activity, condition, reporter_id)
@@ -634,8 +621,8 @@ print(plt)
 
 
 
-## Data quality plots - correlation between replicates
-```{r correlations_3, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+### Data quality plots - correlation between replicates
+```{r correlations_3, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Correlation plots of the replicates
 ## Combine replicates of normalized data in 3 different columns
 bc_df_rep <- bc_df_cDNA_filt %>% select(rep, reporter_activity, reporter_id, condition) %>% unique()
@@ -692,10 +679,7 @@ ggscatter(bc_df_rep, x = "rep3", y = "rep2",
   scale_color_manual(values = colors)+facet_wrap(~condition)
 ```
 
-
-
-## Summarize replicates: summmarize activity values between biological replicates by their geometric mean
-```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # # Create similarity heatmap
 # bc_df_cDNA_filt <- bc_df_cDNA_filt[!is.na(bc_df_cDNA_filt$condition),]
 # cor_heatmap <- bc_df_cDNA_filt %>% select(barcode, condition, activity)
@@ -716,9 +700,7 @@ bc_df_cDNA_filt$reporter_activity <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA_fi
 bc_df_cDNA_filt$reporter_activity_sd <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA_filt$reporter_id, bc_df_cDNA_filt$condition, FUN = function(x) sd(x))
 ```
 
-
-## Exporting data
-```{r data export, out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+```{r data export, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Polish export dataframe
 bc_df_cDNA_filt <- bc_df_cDNA_filt %>% 
   select(-upper_activity, -lower_activity) %>% 
@@ -732,7 +714,7 @@ setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/res
 write.csv(bc_df_cDNA_filt, file = paste(filename,".csv", sep = ""), row.names = F)
 ```
 
-# Session Info
+## Session Info
 ```{r}
 paste("Run time: ",format(Sys.time()-StartTime))
 getwd()
