@@ -434,9 +434,6 @@ bc_df <- merge(pDNA, bc_df)
 
 ## Compute activity by dividing cDNA bc counts through pDNA bc counts
 bc_df$activity <- bc_df$rpm / bc_df$pDNA_counts_rpm
-
-## Remove all activities that were computed with low pDNA bc counts, this keeps the noise level in the data low
-bc_df$activity[bc_df$pDNA_counts_rpm <= 50] <- NA
 ```
 
 
@@ -455,8 +452,9 @@ bc_df_cDNA$reporter_activity_sd <- ave(bc_df_cDNA$activity, bc_df_cDNA$reporter_
 ## Remove data points that are 2xSD away from the mean
 bc_df_cDNA$upper_activity <- bc_df_cDNA$reporter_activity + (2 * bc_df_cDNA$reporter_activity_sd)
 bc_df_cDNA$lower_activity <- bc_df_cDNA$reporter_activity - (2 * bc_df_cDNA$reporter_activity_sd)
-bc_df_cDNA_filt <- bc_df_cDNA[bc_df_cDNA$activity <= bc_df_cDNA$upper_activity & 
-                                bc_df_cDNA$activity >= bc_df_cDNA$lower_activity,]
+bc_df_cDNA_filt <- bc_df_cDNA
+bc_df_cDNA_filt$activity[bc_df_cDNA_filt$activity >= bc_df_cDNA_filt$upper_activity | 
+                                bc_df_cDNA_filt$activity <= bc_df_cDNA_filt$lower_activity] <- NA
 
 ## Recalculate mean and sd
 bc_df_cDNA_filt$reporter_activity <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA_filt$reporter_id, 
@@ -543,29 +541,30 @@ bc_df_cDNA_filt <- bc_df_cDNA_filt[!is.na(bc_df_cDNA_filt$condition),]
 
 ### Calculate correlations between technical replicates
 ```{r correlations_2, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
-## Combine replicates in 8 different columns
+## Combine replicates in 5 different columns
 bc_df_rep <- bc_df_cDNA_filt[bc_df_cDNA_filt$rand_promoter == "No",] %>% 
   dplyr::select(oligo.barcode, activity, tf, condition, reporter_id, pDNA_counts_rpm) %>%
-  mutate(pDNA_counts_rpm = ave(pDNA_counts_rpm, reporter_id, FUN = function(x) mean(x))) %>% unique()
+  mutate(pDNA_counts_rpm = ave(pDNA_counts_rpm, reporter_id, FUN = function(x) min(x))) %>% unique()
 rep1 <- bc_df_rep[bc_df_rep$oligo.barcode == 1,] %>% dplyr::select(-oligo.barcode) %>% setnames("activity", "bc1")
 rep2 <- bc_df_rep[bc_df_rep$oligo.barcode == 2,] %>% dplyr::select(-oligo.barcode) %>% setnames("activity", "bc2")
 rep3 <- bc_df_rep[bc_df_rep$oligo.barcode == 3,] %>% dplyr::select(-oligo.barcode) %>% setnames("activity", "bc3")
 rep4 <- bc_df_rep[bc_df_rep$oligo.barcode == 4,] %>% dplyr::select(-oligo.barcode) %>% setnames("activity", "bc4")
 rep5 <- bc_df_rep[bc_df_rep$oligo.barcode == 5,] %>% dplyr::select(-oligo.barcode) %>% setnames("activity", "bc5")
 
-bc_df_rep <-  Reduce(function(x, y) merge(x, y, all=TRUE), list(rep1, rep2, rep3,rep4, rep5))
+bc_df_rep <-  Reduce(function(x, y) merge(x, y, all=TRUE), list(rep1, rep2, rep3, rep4, rep5))
 bc_df_rep <- bc_df_rep[rowSums(is.na(bc_df_rep)) != ncol(bc_df_rep), ]
 
-cor_df <- data.frame("rpm_cutoff"  = seq(0,100,1), "cor" = "")
+## Compute the correlation between two technical replicates for each pDNA cutoff, separately for each TF
+cor_df <- data.frame("rpm_cutoff"  = seq(0,100,1), "cor" = "", stringsAsFactors=FALSE)
 cor_df <- merge(unique(bc_df_rep$tf), cor_df)
 
 for (i in unique(cor_df$rpm_cutoff)) {
   for (j in unique(cor_df$x)) {
     x <- bc_df_rep[bc_df_rep$pDNA_counts_rpm > i & bc_df_rep$tf == j,]
     if (nrow(x) == 0) {
-      cor_df$cor[cor_df$rpm_cutoff > i & cor_df$x == j] <- NA
+      cor_df$cor[cor_df$rpm_cutoff == i & cor_df$x == j] <- NA
     } else {
-      cor_df$cor[cor_df$rpm_cutoff > i & cor_df$x == j] <- cor(x$bc2, x$bc4, "pairwise.complete.obs")
+      cor_df$cor[cor_df$rpm_cutoff == i & cor_df$x == j] <- cor(x$bc2, x$bc4, use = "pairwise.complete.obs", method = "spearman")
     }
   }
 }
@@ -576,7 +575,27 @@ ggplot(cor_df) +
   ylim(0,1) +
   facet_wrap(~x)
 
-bc_df_rep_2 <- bc_df_rep[bc_df_rep$pDNA_counts_rpm >= 100,]
+## Compute the correlation between two technical replicates for each pDNA cutoff, for all reporters together
+cor_df <- data.frame("rpm_cutoff"  = seq(0,100,1), "cor" = "", stringsAsFactors=FALSE)
+
+for (i in unique(cor_df$rpm_cutoff)) {
+    x <- bc_df_rep[bc_df_rep$pDNA_counts_rpm > i,]
+    if (nrow(x) == 0) {
+      cor_df$cor[cor_df$rpm_cutoff == i] <- NA
+    } else {
+      cor_df$cor[cor_df$rpm_cutoff == i] <- cor(x$bc2, x$bc4, "pairwise.complete.obs", method = "spearman")
+    }
+}
+
+ggplot(cor_df) +
+  geom_point(aes(x = rpm_cutoff, y = as.numeric(cor))) +
+  theme_bw() +
+  ylim(0,1) 
+
+
+## Set a pDNA cutoff based on above plots
+bc_df_cDNA_filt <- bc_df_cDNA_filt$activity[bc_df_cDNA_filt$pDNA_counts_rpm >= 50] <- NA
+bc_df_rep <- bc_df_rep[bc_df_rep$pDNA_counts_rpm >= 50,]
 
 
 # Correlation matrix plot
