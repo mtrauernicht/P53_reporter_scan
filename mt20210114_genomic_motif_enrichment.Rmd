@@ -1,0 +1,81 @@
+---
+title: "genomic P53 motif enrichment"
+author: "Max Trauernicht"
+date: "`r format(Sys.time(), '%Y-%m-%d')`"
+output: 
+  prettydoc::html_pretty:
+    theme: leonids
+    highlight: github
+  #   toc: true
+  #   toc_float: true
+  #   code_folding: show
+  # editor_options:
+  #   chunk_output_type: console
+---
+
+*knitr document van Steensel lab*
+
+# Genomic P53 motif enrichment
+
+# Introduction
+I want to know if the chosen P53 binding sites for my reporter assay correlate with upregulated genes stimulated with Nutlin-3a in MCF7 cells.
+
+```{r setup, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(RcisTarget)
+library(DT)
+library(doMC)
+library(visNetwork)
+library(doRNG)
+```
+
+
+```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+```
+
+### Import data
+```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Import genes
+geneSet1 <- read.delim2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mcf7_nutlin_upregulated_GSE47041.txt")
+geneLists <- list(geneSetName=geneSet1)
+
+# Import motifs
+featherURL <- "https://resources.aertslab.org/cistarget/databases/homo_sapiens/hg19/refseq_r45/mc9nr/gene_based/hg19-tss-centered-10kb-7species.mc9nr.feather" 
+download.file(featherURL, destfile=basename(featherURL)) # saved in current dir
+# Search space: 10k bp around TSS - HUMAN
+motifRankings <- importRankings("hg19-tss-centered-10kb-7species.mc9nr.feather")
+# Load the annotation to human transcription factors
+data(motifAnnotations_hgnc)
+```
+
+
+
+
+
+
+
+
+
+
+
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
