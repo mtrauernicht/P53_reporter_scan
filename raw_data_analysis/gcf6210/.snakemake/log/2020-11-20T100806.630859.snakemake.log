@@ -1,0 +1,662 @@
+Building DAG of jobs...
+Provided cores: 12
+Rules claiming more threads will be scaled down.
+Job counts:
+	count	jobs
+	1	all
+	31	cluster_ecn_barcodes
+	31	extract_barcodes_from_fq
+	63
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43_extract_barcodes_from_fq.log
+    jobid: 53
+    wildcards: ecn=6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49_extract_barcodes_from_fq.log
+    jobid: 50
+    wildcards: ecn=6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4_extract_barcodes_from_fq.log
+    jobid: 49
+    wildcards: ecn=6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4
+
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9_extract_barcodes_from_fq.log
+    jobid: 48
+    wildcards: ecn=6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3_extract_barcodes_from_fq.log
+    jobid: 61
+    wildcards: ecn=6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3
+
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50_extract_barcodes_from_fq.log
+    jobid: 43
+    wildcards: ecn=6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50
+
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8_extract_barcodes_from_fq.log
+    jobid: 58
+    wildcards: ecn=6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42_extract_barcodes_from_fq.log
+    jobid: 45
+    wildcards: ecn=6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48_extract_barcodes_from_fq.log
+    jobid: 39
+    wildcards: ecn=6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26_extract_barcodes_from_fq.log
+    jobid: 32
+    wildcards: ecn=6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26
+
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25_extract_barcodes_from_fq.log
+    jobid: 44
+    wildcards: ecn=6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25
+
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41_extract_barcodes_from_fq.log
+    jobid: 56
+    wildcards: ecn=6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41
+
+Finished job 39.
+1 of 63 steps (2%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27_extract_barcodes_from_fq.log
+    jobid: 33
+    wildcards: ecn=6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27
+
+Finished job 56.
+2 of 63 steps (3%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21_extract_barcodes_from_fq.log
+    jobid: 40
+    wildcards: ecn=6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21
+
+Finished job 48.
+3 of 63 steps (5%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44_extract_barcodes_from_fq.log
+    jobid: 59
+    wildcards: ecn=6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44
+
+Finished job 43.
+4 of 63 steps (6%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55_extract_barcodes_from_fq.log
+    jobid: 37
+    wildcards: ecn=6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55
+
+Finished job 61.
+5 of 63 steps (8%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30_extract_barcodes_from_fq.log
+    jobid: 41
+    wildcards: ecn=6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30
+
+Finished job 44.
+6 of 63 steps (10%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28_extract_barcodes_from_fq.log
+    jobid: 34
+    wildcards: ecn=6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28
+
+Finished job 32.
+7 of 63 steps (11%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54_extract_barcodes_from_fq.log
+    jobid: 62
+    wildcards: ecn=6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54
+
+Finished job 50.
+8 of 63 steps (13%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32_extract_barcodes_from_fq.log
+    jobid: 36
+    wildcards: ecn=6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32
+
+Finished job 49.
+9 of 63 steps (14%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2_extract_barcodes_from_fq.log
+    jobid: 54
+    wildcards: ecn=6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2
+
+Finished job 58.
+10 of 63 steps (16%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14_extract_barcodes_from_fq.log
+    jobid: 47
+    wildcards: ecn=6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14
+
+Finished job 53.
+11 of 63 steps (17%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19_extract_barcodes_from_fq.log
+    jobid: 55
+    wildcards: ecn=6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19
+
+Finished job 45.
+12 of 63 steps (19%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20_extract_barcodes_from_fq.log
+    jobid: 46
+    wildcards: ecn=6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20
+
+Finished job 33.
+13 of 63 steps (21%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13_extract_barcodes_from_fq.log
+    jobid: 51
+    wildcards: ecn=6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13
+
+Finished job 59.
+14 of 63 steps (22%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31_extract_barcodes_from_fq.log
+    jobid: 38
+    wildcards: ecn=6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31
+
+Finished job 41.
+15 of 63 steps (24%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1_extract_barcodes_from_fq.log
+    jobid: 52
+    wildcards: ecn=6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1
+
+Finished job 40.
+16 of 63 steps (25%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37_extract_barcodes_from_fq.log
+    jobid: 57
+    wildcards: ecn=6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37
+
+Finished job 37.
+17 of 63 steps (27%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36_extract_barcodes_from_fq.log
+    jobid: 35
+    wildcards: ecn=6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36
+
+Finished job 47.
+18 of 63 steps (29%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38_extract_barcodes_from_fq.log
+    jobid: 60
+    wildcards: ecn=6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38
+
+Finished job 54.
+19 of 63 steps (30%) done
+
+rule extract_barcodes_from_fq:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/raw/6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18_R1_001.fastq.gz
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18_barcodes.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18_extract_barcodes_from_fq.log
+    jobid: 42
+    wildcards: ecn=6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18
+
+Finished job 34.
+20 of 63 steps (32%) done
+Finished job 62.
+21 of 63 steps (33%) done
+Finished job 36.
+22 of 63 steps (35%) done
+Finished job 55.
+23 of 63 steps (37%) done
+Finished job 42.
+24 of 63 steps (38%) done
+Finished job 60.
+25 of 63 steps (40%) done
+Finished job 52.
+26 of 63 steps (41%) done
+Finished job 57.
+27 of 63 steps (43%) done
+Finished job 35.
+28 of 63 steps (44%) done
+Finished job 51.
+29 of 63 steps (46%) done
+Finished job 46.
+30 of 63 steps (48%) done
+Finished job 38.
+31 of 63 steps (49%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43_cluster_ecn_barcodes.log
+    jobid: 22
+    wildcards: ecn=6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43
+    threads: 12
+
+Finished job 22.
+32 of 63 steps (51%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42_cluster_ecn_barcodes.log
+    jobid: 14
+    wildcards: ecn=6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42
+    threads: 12
+
+Finished job 14.
+33 of 63 steps (52%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8_cluster_ecn_barcodes.log
+    jobid: 27
+    wildcards: ecn=6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8
+    threads: 12
+
+Finished job 27.
+34 of 63 steps (54%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4_cluster_ecn_barcodes.log
+    jobid: 18
+    wildcards: ecn=6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4
+    threads: 12
+
+Finished job 18.
+35 of 63 steps (56%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26_cluster_ecn_barcodes.log
+    jobid: 1
+    wildcards: ecn=6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26
+    threads: 12
+
+Finished job 1.
+36 of 63 steps (57%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3_cluster_ecn_barcodes.log
+    jobid: 30
+    wildcards: ecn=6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3
+    threads: 12
+
+Finished job 30.
+37 of 63 steps (59%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49_cluster_ecn_barcodes.log
+    jobid: 19
+    wildcards: ecn=6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49
+    threads: 12
+
+Finished job 19.
+38 of 63 steps (60%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25_cluster_ecn_barcodes.log
+    jobid: 13
+    wildcards: ecn=6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25
+    threads: 12
+
+Finished job 13.
+39 of 63 steps (62%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50_cluster_ecn_barcodes.log
+    jobid: 12
+    wildcards: ecn=6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50
+    threads: 12
+
+Finished job 12.
+40 of 63 steps (63%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41_cluster_ecn_barcodes.log
+    jobid: 25
+    wildcards: ecn=6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41
+    threads: 12
+
+Finished job 25.
+41 of 63 steps (65%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9_cluster_ecn_barcodes.log
+    jobid: 17
+    wildcards: ecn=6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9
+    threads: 12
+
+Finished job 17.
+42 of 63 steps (67%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48_cluster_ecn_barcodes.log
+    jobid: 8
+    wildcards: ecn=6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48
+    threads: 12
+
+Finished job 8.
+43 of 63 steps (68%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21_cluster_ecn_barcodes.log
+    jobid: 9
+    wildcards: ecn=6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21
+    threads: 12
+
+Finished job 9.
+44 of 63 steps (70%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55_cluster_ecn_barcodes.log
+    jobid: 6
+    wildcards: ecn=6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55
+    threads: 12
+
+Finished job 6.
+45 of 63 steps (71%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27_cluster_ecn_barcodes.log
+    jobid: 2
+    wildcards: ecn=6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27
+    threads: 12
+
+Finished job 2.
+46 of 63 steps (73%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44_cluster_ecn_barcodes.log
+    jobid: 28
+    wildcards: ecn=6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44
+    threads: 12
+
+Finished job 28.
+47 of 63 steps (75%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30_cluster_ecn_barcodes.log
+    jobid: 10
+    wildcards: ecn=6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30
+    threads: 12
+
+Finished job 10.
+48 of 63 steps (76%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28_cluster_ecn_barcodes.log
+    jobid: 3
+    wildcards: ecn=6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28
+    threads: 12
+
+Finished job 3.
+49 of 63 steps (78%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54_cluster_ecn_barcodes.log
+    jobid: 31
+    wildcards: ecn=6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54
+    threads: 12
+
+Finished job 31.
+50 of 63 steps (79%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32_cluster_ecn_barcodes.log
+    jobid: 5
+    wildcards: ecn=6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32
+    threads: 12
+
+Finished job 5.
+51 of 63 steps (81%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2_cluster_ecn_barcodes.log
+    jobid: 23
+    wildcards: ecn=6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2
+    threads: 12
+
+Finished job 23.
+52 of 63 steps (83%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31_cluster_ecn_barcodes.log
+    jobid: 7
+    wildcards: ecn=6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31
+    threads: 12
+
+Finished job 7.
+53 of 63 steps (84%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20_cluster_ecn_barcodes.log
+    jobid: 15
+    wildcards: ecn=6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20
+    threads: 12
+
+Finished job 15.
+54 of 63 steps (86%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19_cluster_ecn_barcodes.log
+    jobid: 24
+    wildcards: ecn=6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19
+    threads: 12
+
+Finished job 24.
+55 of 63 steps (87%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13_cluster_ecn_barcodes.log
+    jobid: 20
+    wildcards: ecn=6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13
+    threads: 12
+
+Finished job 20.
+56 of 63 steps (89%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14_cluster_ecn_barcodes.log
+    jobid: 16
+    wildcards: ecn=6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14
+    threads: 12
+
+Finished job 16.
+57 of 63 steps (90%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36_cluster_ecn_barcodes.log
+    jobid: 4
+    wildcards: ecn=6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36
+    threads: 12
+
+Finished job 4.
+58 of 63 steps (92%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37_cluster_ecn_barcodes.log
+    jobid: 26
+    wildcards: ecn=6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37
+    threads: 12
+
+Finished job 26.
+59 of 63 steps (94%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1_cluster_ecn_barcodes.log
+    jobid: 21
+    wildcards: ecn=6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1
+    threads: 12
+
+Finished job 21.
+60 of 63 steps (95%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38_cluster_ecn_barcodes.log
+    jobid: 29
+    wildcards: ecn=6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38
+    threads: 12
+
+Finished job 29.
+61 of 63 steps (97%) done
+
+rule cluster_ecn_barcodes:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18_barcodes.tsv
+    output: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18_barcode_counts.tsv
+    log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/logs/6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18_cluster_ecn_barcodes.log
+    jobid: 11
+    wildcards: ecn=6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18
+    threads: 12
+
+Finished job 11.
+62 of 63 steps (98%) done
+
+localrule all:
+    input: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_32_mES_pMT06_N2B27-HQ_rep2_CACGTT-GATATCGA_S32_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_9_A549_pMT06_Dex-100_rep1_GATCAG-AGCGCTAG_S9_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_14_mES_pMT06_N2B27-HQ_rep1_CACGTT-AGCGCTAG_S14_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_41_A549_pMT06_DMSO_rep3_ACTTGA-CGCAGACG_S41_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_31_mES_pMT06_N2B27-RA_rep2_AGTGGT-GATATCGA_S31_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_19_MCF7-KO_pMT06_Nutlin_rep2_CGATGT-GATATCGA_S19_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_3_MCF7-WT_pMT06_DMSO_rep1_TTAGGC-AGCGCTAG_S3_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_27_A549_pMT06_Dex-10_rep2_TAGCTT-GATATCGA_S27_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_36_MCF7-KO_pMT06_Nutlin_rep3_CGATGT-CGCAGACG_S36_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_55_pMT06_pDNA_rep2_TGTACT-AGCGCTAG_S55_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_38_MCF7-WT_pMT06_Nutlin_rep3_TGACCA-CGCAGACG_S38_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_30_mES_pMT06_DMSO_rep2_CAATGT-GATATCGA_S30_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_8_A549_pMT06_DMSO_rep1_ACTTGA-AGCGCTAG_S8_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_13_mES_pMT06_N2B27-RA_rep1_AGTGGT-AGCGCTAG_S13_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_21_MCF7-WT_pMT06_Nutlin_rep2_TGACCA-GATATCGA_S21_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_37_MCF7-WT_pMT06_DMSO_rep3_TTAGGC-CGCAGACG_S37_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_50_mES_pMT06_N2B27-HQ_rep3_CACGTT-CGCAGACG_S50_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_26_A549_pMT06_Dex-100_rep2_GATCAG-GATATCGA_S26_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_48_mES_pMT06_DMSO_rep3_CAATGT-CGCAGACG_S48_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_25_A549_pMT06_DMSO_rep2_ACTTGA-GATATCGA_S25_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_49_mES_pMT06_N2B27-RA_rep3_AGTGGT-CGCAGACG_S49_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_54_pMT06_pDNA_rep1_CTACAG-AGCGCTAG_S54_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_2_MCF7-KO_pMT06_Nutlin_rep1_CGATGT-AGCGCTAG_S2_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_18_MCF7-KO_pMT06_DMSO_rep2_ATCACG-GATATCGA_S18_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_1_MCF7-KO_pMT06_DMSO_rep1_ATCACG-AGCGCTAG_S1_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_43_A549_pMT06_Dex-10_rep3_TAGCTT-CGCAGACG_S43_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_42_A549_pMT06_Dex-100_rep3_GATCAG-CGCAGACG_S42_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_4_MCF7-WT_pMT06_Nutlin_rep1_TGACCA-AGCGCTAG_S4_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_44_A549_pMT06_Dex-1_rep3_GGCTAC-CGCAGACG_S44_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_28_A549_pMT06_Dex-1_rep2_GGCTAC-GATATCGA_S28_barcode_counts.tsv, /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6210/results_d3/6210_20_MCF7-WT_pMT06_DMSO_rep2_TTAGGC-GATATCGA_S20_barcode_counts.tsv
+    jobid: 0
+
+Finished job 0.
+63 of 63 steps (100%) done
+Complete log: /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/stimulation_1/raw_data_analysis/.snakemake/log/2020-11-20T100806.630859.snakemake.log
