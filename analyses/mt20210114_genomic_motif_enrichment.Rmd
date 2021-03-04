@@ -59,6 +59,33 @@ motifRankings <- importRankings("hg19-tss-centered-10kb-7species.mc9nr.feather")
 # Load the annotation to human transcription factors
 data(motifAnnotations_hgnc)
 ```
+### Extract TSSs
+```{r}
+library(biomaRt)
+library(regioneR)
+library(BSgenome.Hsapiens.UCSC.hg19)
+library(GenomicFeatures)
+library(TxDb.Hsapiens.UCSC.hg19.knownGene)
+
+
+## Get all transcripts
+txdb <- TxDb.Hsapiens.UCSC.hg19.knownGene
+
+# Get 500 bp upstream of TSS
+genome <- BSgenome.Hsapiens.UCSC.hg19
+x <- extractUpstreamSeqs(genome, txdb, width=500)
+
+
+# filter transcripts for only nutlin-upregulated transcripts
+mart <- useDataset("hsapiens_gene_ensembl", useMart("ensembl"))
+genes <- getBM(filters = "hgnc_symbol", attributes= "ensembl_gene_id",values=geneSet1, mart= mart)
+genes$ensembl_gene_id <- gsub("ENSG", "", genes$ensembl_gene_id) 
+genes$ensembl_gene_id <- as.numeric(genes$ensembl_gene_id)
+genes$ensembl_gene_id <- gsub(".*\\[1-9]", "", genes$ensembl_gene_id)
+
+x2 <- x[names(x) %in% genes$ensembl_gene_id]
+```
+
 
 
 
