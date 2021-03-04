@@ -1384,6 +1384,13 @@ tf.df$seq.text <- paste(tf.df$primer1_seq, tf.df$position_seq, tf.df$motif1, tf.
                     tf.df$space2, tf.df$motif3, tf.df$space3, tf.df$motif4, 
                     tf.df$distance.seq, tf.df$promoter_sequence, tf.df$s1_primer,
                     tf.df$barcode, tf.df$primer2_seq, sep = "")
+tf.df_2 <- tf.df
+tf.df_2$seq.text <- paste(tf.df_2$position_seq, tf.df_2$motif1, tf.df_2$space1, tf.df_2$motif2,
+                    tf.df_2$space2, tf.df_2$motif3, tf.df_2$space3, tf.df_2$motif4, 
+                    tf.df_2$distance.seq, sep = "")
+tf.df_2$seq.name <- paste(tf.df_2$tf, "p", tf.df_2$position, "s", tf.df_2$spacing, "d", tf.df_2$distance, "bg",
+                        tf.df_2$background, "a1", tf.df_2$affinity_pos1, "a2",
+                           tf.df_2$affinity_pos2, "a3", tf.df_2$affinity_pos3, "a4", tf.df_2$affinity_pos4, sep = "_")
 print(nrow(tf.df[grep(paste(ecori_nhei, collapse = "|"),tf.df$seq.text),]))
 
 
@@ -1405,17 +1412,17 @@ ggplot(tf.df, aes(x = nchar)) +
 ## Exporting potential data. 
 ```{r}
 ## Exporting
-tf.df.export <- tf.df %>% dplyr::select(seq.name, seq.text) %>% unique()
+tf.df.export <- tf.df_2 %>% dplyr::select(seq.name, seq.text) %>% unique()
 paste("duplicate sequence names: ", nrow(tf.df.export[duplicated(tf.df.export$seq.name),]), sep ="")
 paste("duplicate sequences: ", nrow(tf.df.export[duplicated(tf.df.export$seq.text),]), sep ="")
-filename <- SetFileName("_oligo_pool_deep", "mt")
+filename <- SetFileName("_oligo_pool_deep_RE_only", "mt")
 
 # Write csv file
-setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/output/")
+setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/")
 write.csv(tf.df.export, file = paste(filename,".csv", sep = ""), row.names = F)
 
 # Write fasta file
-setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/output/")
+setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/")
 dat2fasta(tf.df.export, outfile = paste(filename,".fasta", sep = ""))  
 
 ```
