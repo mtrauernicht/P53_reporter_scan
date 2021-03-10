@@ -327,17 +327,25 @@ cDNA_df <- cDNA_df %>%
 ### Add affinity values for each reporter
 reporter_affinity_p53 <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/p53scores.tsv") %>%
   dplyr::select('reporter_id_2' = Name, SumAffinity)
+
+reporter_affinity_p53_complete <-
+  read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/p53scores_complete.tsv") %>%
+  dplyr::select('reporter_id_3' = Name, 'reporter_affinity' = SumAffinity)
+
 cDNA_df <- cDNA_df %>%
   mutate(reporter_id_2 = gsub("^.*_(.*?_).*","\\1", reporter_id),
-         reporter_id_2 = gsub(reporter_id_2, "", reporter_id))
+         reporter_id_2 = gsub(reporter_id_2, "", reporter_id),
+         reporter_id_3 = paste(reporter_id, "_bc_", oligo.barcode, sep = ""))
+
 cDNA_df <- merge(cDNA_df, reporter_affinity_p53)
+cDNA_df <- merge(cDNA_df, reporter_affinity_p53_complete, all = T)
 ```
 
 ## Analysis
 
 ### First insights into data distribution - reporter activity distribution plots
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
-## reporter activity distribution over all experiments
+## save favorite colors
 colors <- c("#1B998B", "#2D3047", "#FF9B71")
 
 ## reporter activity distribution for each experiment individually
@@ -665,6 +673,29 @@ ggplot(cDNA_df %>%
   xlab("reporter affinity rank (increasing)")+
   labs(title = "reporter activity per affinity")
 
+
+
+## Activity per predicted reporter affinity - now not only the affinity of the RE but the whole reporter
+ggplot(cDNA_df %>%
+         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
+                str_detect(condition, "MCF")) %>%
+         dplyr::select(reporter_activity_condition, condition, reporter_affinity) %>%
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, condition, reporter_affinity,
+                                                  FUN = function(x) mean(x))) %>%
+         unique() %>%
+         arrange(reporter_affinity) %>%
+         group_by(condition) %>%
+         mutate(reporter_affinity = 1:length(reporter_affinity)),
+       aes(x = reporter_affinity, y = reporter_activity_condition))+
+  geom_point(alpha = .4) +
+  geom_smooth(method = "gam", fill = "#2D3047", color = "#2D3047", alpha = 0.4)+
+  theme_bw() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
+  ylab("reporter activity (a.u.)")+
+  xlab("reporter affinity rank (increasing)")+
+  labs(title = "reporter activity per affinity")+
+  facet_wrap(~condition, nrow = 2)
 
 
 
@@ -1379,7 +1410,7 @@ print(cDNA_dfMod)
 # Select features and activity to predict
 cDNA_df_p53 <- cDNA_df %>%
   filter(neg_ctrls == "No", positive_ctrl == "No", outlier == "No", str_detect(affinity_id, "[1-5]_"),
-         promoter == "mCMV", str_detect(condition, "MCF")) %>%
+         promoter == "mCMV", str_detect(condition, "MCF7-WT_DMSO")) %>%
   dplyr::select(reporter_id, condition, reporter_activity_condition, 
                 affinity_pos1,spacing, background) %>%
   mutate(spacing = as.factor(spacing),
@@ -1402,6 +1433,17 @@ validation1 <- cDNA_df_p53[-indexes,]
 rf_features <- randomForest(reporter_activity_condition ~ affinity_pos1 + spacing + background, 
                   data = training, ntree=100, mtry = 2, importance=TRUE)
 
+# Evaluate the model
+pred = predict(rf_features, newdata=validation1[,c(-1,-2,-3)])
+validation1$prediction <- pred
+ggscatter(validation1, x = "reporter_activity_condition", y = "prediction",
+          add = "reg.line",
+          add.params = list(color = "blue", fill = "lightgray"),
+          conf.int = TRUE, ylab = "Predicted log2-activity", size = 0.5,
+          xlab = "Average log2-activity") + 
+  theme_bw() + 
+  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 1.5, label.y = 3)
+
 # Extract features and plot their importance
 feature_df <- data.frame(importance(rf_features), stringsAsFactors=FALSE) %>% rownames_to_column("feature") %>%
   dplyr::select(-IncNodePurity)
@@ -1421,11 +1463,82 @@ explained_rf <- explain(rf_features, data=training[,c(-1,-2,-3)], y=training$rep
 # Get the variable importances
 varimps = variable_importance(explained_rf, type='raw')
 
-plot(varimps)
-
+ggplot(varimps %>% filter(variable != "_full_model_", variable != "_baseline_"), aes(y = variable, x = dropout_loss)) +
+    geom_quasirandom()+
+    geom_boxplot(alpha = 0.4)+
+    xlab("dropout loss (RMSE)")+
+    theme_bw()
 ```
 
 
+
+
+
+### Random forest implementation - explain affinity position importance
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+# Select features and activity to predict
+cDNA_df_p53 <- cDNA_df %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", outlier == "No", 
+         spacing == "7", background == "1", affinity_id == "0_mixed_any",
+         promoter == "mCMV", str_detect(condition, "MCF7-WT_DMSO")) %>%
+  dplyr::select(reporter_id, condition, reporter_activity_condition, 
+                affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4) %>% 
+  mutate(reporter_activity_condition = log2(reporter_activity_condition)) %>%
+  unique()
+
+
+
+# Set random seed to make results reproducible:
+set.seed(17)
+# Calculate the size of each of the data sets:
+data_set_size <- floor(nrow(cDNA_df_p53)/2)
+# Generate a random sample of "data_set_size" indexes
+indexes <- sample(1:nrow(cDNA_df_p53), size = data_set_size)
+# Assign the data to the correct sets
+training <- cDNA_df_p53[indexes,]
+validation1 <- cDNA_df_p53[-indexes,]
+
+# Perform random forest analysis
+rf_features <- randomForest(reporter_activity_condition ~ affinity_pos1 + affinity_pos2 + affinity_pos3 + affinity_pos4, 
+                  data = training, ntree=100, mtry = 2, importance=TRUE)
+
+# Evaluate the model
+pred = predict(rf_features, newdata=validation1[,c(-1,-2,-3)])
+validation1$prediction <- pred
+ggscatter(validation1, x = "reporter_activity_condition", y = "prediction",
+          add = "reg.line",
+          add.params = list(color = "blue", fill = "lightgray"),
+          conf.int = TRUE, ylab = "Predicted log2-activity", size = 0.5,
+          xlab = "Average log2-activity") + 
+  theme_bw() + 
+  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 1.5, label.y = 3)
+
+# Extract features and plot their importance
+feature_df <- data.frame(importance(rf_features), stringsAsFactors=FALSE) %>% rownames_to_column("feature") %>%
+  dplyr::select(-IncNodePurity)
+
+
+plot_ly(feature_df, x = ~feature, y = ~X.IncMSE, type = 'bar',
+             marker = list(color = '#D6D5C9',
+                           line = list(color = 'rgb(8,48,107)', width = 1.5))) %>% 
+  layout(title = "Random forest - factor importance plot (P53-mCMV reporters)",
+         xaxis = list(title = "Feature"),
+         yaxis = list(title = "%IncMSE"))
+
+# Variable importance with DALEX
+library(DALEX)
+explained_rf <- explain(rf_features, data=training[,c(-1,-2,-3)], y=training$reporter_activity_condition)
+
+# Get the variable importances
+varimps = variable_importance(explained_rf, type='raw')
+
+ggplot(varimps %>% filter(variable != c("_full_model_","_baseline_")), aes(y = variable, x = dropout_loss)) +
+  geom_quasirandom()+
+  geom_boxplot(alpha = 0.4)+
+  xlim(0.2,0.8)+
+  xlab("dropout loss (RMSE)")+
+  theme_bw()
+```
 
 
 
