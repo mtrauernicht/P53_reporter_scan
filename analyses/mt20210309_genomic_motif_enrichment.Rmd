@@ -80,13 +80,26 @@ save(tss_annotated, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp5
 # Import data
 load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_tss_per_position.Rda")
 
-# Put the scores of all TSSs into one large data frame - only keep the forward matching
-tss_scores <- data.frame(matrix(unlist(tss.per.pos$Scores), nrow=length(tss.per.pos$Scores), byrow=TRUE))
-tss_scores <- tss_scores[,seq(1, ncol(tss_scores), 2)]
-names(tss_scores) <- paste("pos", 1:477, sep = "_")
-rownames(tss_scores) <- names(tss.per.pos$Scores)
-tss_scores <- tss_scores %>%
-  rownames_to_column(var = "transcript_id")
+# # Put the scores of all TSSs into one large data frame - only keep the forward matching
+# tss_scores <- data.frame(matrix(ncol = 477, nrow = 1))
+# names(tss_scores) <- 1:477
+# 
+# count <- 0
+# for (i in unique(names(tss.per.pos$Scores))) {
+#   x <- data.frame(data.frame(tss.per.pos$Scores[i]))[1,]
+#   names(x) <- 1:ncol(x)
+#   tss_scores <- rbind(tss_scores, x)
+#   count <- count + length(i)
+#   print(count)
+# }
+# 
+# tss_scores <- tss_scores[-1,]
+# rownames(tss_scores) <- names(tss.per.pos$Scores)
+# tss_scores <- tss_scores %>%
+#   rownames_to_column(var = "transcript_id")
+load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mt20200309_tss_scored_affinity.RData")
+
+
 tss_scores <- merge(tss_annotated, tss_scores)
 ```
 
@@ -99,7 +112,8 @@ tss_scores[, "max"] <- apply(tss_scores[, 13:489], 1, max)
 ggplot(tss_scores, aes(x = "All promoters", y = max)) +
   geom_violin() +
   xlab("")+
-  ggtitle("P53 binding score across all TSSs")+
+  ylab("max. relative binding affinity")+
+  ggtitle("Maximum P53 binding score - all promoters")+
   theme_bw()
 
 
@@ -123,9 +137,11 @@ ggplot(enrichment_scores, aes(x = position, y = enrichment)) +
 ### Import MCF7 RNA-seq gene list
 ```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Import genes that are differentially expressed according to Aerts paper (Janky et al., iRegulon)
-geneSet1 <- read.delim2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mcf7_nutlin_upregulated_GSE47041.txt") %>%
+geneSet1 <- read.delim2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mcf7_nutlin_upregulated_GSE47041.txt",
+                        stringsAsFactors = F) %>%
   mutate(nutlin = "upregulated")
-geneSet2 <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mcf7_nutlin_downregulated.csv") %>%
+geneSet2 <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mcf7_nutlin_downregulated.csv",
+                      stringsAsFactors = F) %>%
   mutate(nutlin = "downregulated")
 
 # Annotate the tss data frame with the gene symbols
@@ -143,13 +159,79 @@ tss_scores <- merge(tss_scores, G_list, all = T)
 
 
 # Add up-or downregulated information to tss data frame
-tss_scores$nutlin <- "unchanged"
-tss_scores <- merge(tss_scores, geneSet1, all = T)
+tss_scores <- Reduce(function(x, y) merge(x, y, all = T, by = "genes"), list(tss_scores, geneSet1, geneSet2))
+tss_scores$nutlin.x[is.na(tss_scores$nutlin.x)] <- ""
+tss_scores$nutlin.y[is.na(tss_scores$nutlin.y)] <- ""
+tss_scores$nutlin <- paste(tss_scores$nutlin.x, tss_scores$nutlin.y, sep = "")
+tss_scores$nutlin[tss_scores$nutlin == ""] <- "unchanged"
+tss_scores <- tss_scores %>%
+  dplyr::select(-nutlin.x, -nutlin.y)
+
+# Plot max affinity scores per nutlin category
+ggplot(tss_scores %>% dplyr::select(nutlin, max) %>% unique(),
+       aes(x = nutlin, y = max)) +
+  geom_quasirandom() +
+  theme_bw()
+```
+There's not a clearly visible difference between Nutlin-upregulated and unchanged P53 binding in the promoter sequences. We need to check whether there's any specific enrichment at the exact affinities of my reporters to get a better picture.
 
 
+# Load the reporter affinities 
+```{r}
+# Import data
+load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_per_position.Rda")
+
+# Put the scores of all TSSs into one large data frame - only keep the forward matching
+# reporter_scores <- data.frame(matrix(ncol = 215, nrow = 1))
+# names(reporter_scores) <- 1:215
+# 
+# for (i in unique(names(per.pos$Scores))) {
+#   x <- data.frame(data.frame(per.pos$Scores[i]))[1,]
+#   names(x) <- 1:ncol(x)
+#   rownames(x) <- i
+#   reporter_scores <- rbind.fill(reporter_scores, x)
+# }
+# reporter_scores <- reporter_scores[-1,]
+# rownames(reporter_scores) <- names(per.pos$Scores)
+# reporter_scores <- reporter_scores %>%
+#   rownames_to_column(var = "reporter_id")
+load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/reporter_affinity_scores.RData")
 ```
 
 
+
+
+
+```{r}
+## enrichmennt plot from -500bp to TSS
+load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/cDNA_df.RData")
+cDNA_df <- cDNA_df %>%
+  dplyr::select("reporter_id" = reporter_id_3, neg_ctrls, affinity_id) %>%
+  unique()
+reporter_scores <- merge(reporter_scores, cDNA_df, all = T)
+
+reporter_scores_sel <- reporter_scores %>%
+  filter(neg_ctrls == "No", str_detect(affinity_id, "2|3"))
+
+reporter_scores_sel <- melt(reporter_scores_sel, variable.name = "position", value.name = "affinity",
+                              id.vars = c("neg_ctrls", "affinity_id", "reporter_id"))
+
+example_reporter <- 
+  reporter_scores_sel[reporter_scores_sel$reporter_id %in%
+                        c("Trp53_mCMV_p_0_s_0_d_10_bg_1_a1_2_a2_2_a3_2_a4_2_bc_1",
+                          "Trp53_mCMV_p_0_s_0_d_10_bg_1_a1_3_a2_3_a3_3_a4_3_bc_1"),]
+
+colors <- c(color = '#A1B0AB', "#373930")
+ggplot(example_reporter, aes(x = as.numeric(position), y = affinity, color = affinity_id)) +
+  geom_point()+
+  xlim(0,215)+
+  theme_bw()+
+  ylab("affinity relative to perfect match")+
+  scale_color_manual(values = colors)+
+  xlab("reporter position")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
+  theme(legend.position = "bottom")
+```
 
 
 
