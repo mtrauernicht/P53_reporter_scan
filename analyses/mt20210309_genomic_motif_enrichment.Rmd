@@ -37,6 +37,10 @@ library(ggplot2)
 library(reshape)
 library(ggbeeswarm)
 library(biomaRt)
+library(readr)
+library(stringr)
+library(maditr)
+library(phylotools)
 ```
 
 
@@ -48,12 +52,40 @@ SetFileName <- function(filename, initials) {
   filename <- paste0(initials, Date, filename)
   filename
 }
+
+ReadFasta<-function(file) {
+   # Read the file line by line
+   fasta<-readLines(file)
+   # Identify header lines
+   ind<-grep(">", fasta)
+   # Identify the sequence lines
+   s<-data.frame(ind=ind, from=ind+1, to=c((ind-1)[-1], length(fasta)))
+   # Process sequence lines
+   seqs<-rep(NA, length(ind))
+   for(i in 1:length(ind)) {
+      seqs[i]<-paste(fasta[s$from[i]:s$to[i]], collapse="")
+   }
+   # Create a data frame 
+   DF<-data.frame(name=gsub(">", "", fasta[ind]), sequence=seqs)
+   # Return the data frame as a result object from the function
+   return(DF)
+}
 ```
 
 
+```{r knits setup, echo=FALSE, warning= FALSE, message=FALSE}
+# Prepare output 
+library(knitr)
+filename <- SetFileName("_figures","mt")
+dir.create(paste("results/", filename, sep = ""), showWarnings = FALSE)
+opts_chunk$set(fig.width = 4, fig.height = 4, 
+               dev=c('png', 'pdf'), fig.path = file.path(paste("results/", filename, "/", sep = ""))) 
+pdf.options(useDingbats = FALSE)
+```
 
-## Alterative approach: Import TSSs from Christ
-```{r}
+
+## Import TSSs from Christ
+```{r, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Import selected TSSs from Christ, gencode.v27
 # Original locatioN: DATA/scratch/usr/c.leemans/projects/meta_gene_plots/cl20200811_TSS_window_TOP_DRB/selection/
 tss_annotated <- read.delim2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gencode.v27-fantom-selection.txt", header = F, col.names = c("chr", "TSS_position", "transcript_id", "strand", "gene_id", "expr_avg", "n_tissues"))
@@ -70,13 +102,13 @@ tss_annotated$width <- 1 + (tss_annotated$end - tss_annotated$start)
 # Extract genomic sequence matching the selected promoter_start to TSS locations
 gr <- makeGRangesFromDataFrame(tss_annotated)
 
-tss_annotated$seq <- getSeq(Hsapiens, names = gr, as.character = T)
-# Save file
-save(tss_annotated, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mt20210308_hg38_promoters-500bp.RData")
+tss_annotated$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg38::Hsapiens, names = gr, as.character = T)
+# # Save file
+# save(tss_annotated, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mt20210308_hg38_promoters-500bp.RData")
 ```
 
 ### Import P53-promoter scores
-```{r}
+```{r, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Import data
 load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_tss_per_position.Rda")
 
@@ -105,7 +137,7 @@ tss_scores <- merge(tss_annotated, tss_scores)
 
 
 
-```{r}
+```{r max_scores_all_promoters, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 ## plot the maximum score for each promoter
 tss_scores[, "max"] <- apply(tss_scores[, 13:489], 1, max)
 
@@ -115,27 +147,13 @@ ggplot(tss_scores, aes(x = "All promoters", y = max)) +
   ylab("max. relative binding affinity")+
   ggtitle("Maximum P53 binding score - all promoters")+
   theme_bw()
-
-
-## enrichment plot from -500bp to TSS
-
-
-enrichment_scores <- data.frame("position" = 1:477,
-                                "enrichment" = colMeans(tss_scores[, 13:489]),
-                                stringsAsFactors = F)
-
-ggplot(enrichment_scores, aes(x = position, y = enrichment)) +
-  geom_point()+
-  geom_smooth(method = "gam", alpha = 0.4)+
-  theme_bw()+
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
 ```
 
 
 
 
 ### Import MCF7 RNA-seq gene list
-```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+```{r mcf7_up_down_scoring, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Import genes that are differentially expressed according to Aerts paper (Janky et al., iRegulon)
 geneSet1 <- read.delim2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mcf7_nutlin_upregulated_GSE47041.txt",
                         stringsAsFactors = F) %>%
@@ -165,7 +183,8 @@ tss_scores$nutlin.y[is.na(tss_scores$nutlin.y)] <- ""
 tss_scores$nutlin <- paste(tss_scores$nutlin.x, tss_scores$nutlin.y, sep = "")
 tss_scores$nutlin[tss_scores$nutlin == ""] <- "unchanged"
 tss_scores <- tss_scores %>%
-  dplyr::select(-nutlin.x, -nutlin.y)
+  dplyr::select(-nutlin.x, -nutlin.y) %>% 
+  unique()
 
 # Plot max affinity scores per nutlin category
 ggplot(tss_scores %>% dplyr::select(nutlin, max) %>% unique(),
@@ -177,7 +196,7 @@ There's not a clearly visible difference between Nutlin-upregulated and unchange
 
 
 # Put in long format and plot more
-```{r}
+```{r individual_promoter_plots, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Filter only relevant genes
 tss_scores_2 <- tss_scores[tss_scores$genes != "",]
 tss_scores_2 <- tss_scores_2[tss_scores_2$nutlin != "unchanged",]
@@ -186,7 +205,7 @@ tss_scores_2 <- tss_scores_2[tss_scores_2$nutlin != "unchanged",]
 tss_scores_2 <- melt(tss_scores_2, id.vars = c("genes", "ensembl_gene_id", "transcript_id", 
                                              "chr", "TSS_position", "strand", "gene_id", "expr_avg", 
                                              "n_tissues", "promoter_start", "start", "end", "width", "seq", "max", "nutlin"),
-                     variable_name = "position")
+                     variable.name = "position")
 
 # Plot enrichment graph for Aerts top hit: CDKN1A
 
@@ -196,10 +215,11 @@ p53_cdkn1a <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr
 ggplot(data = tss_scores_2 %>% filter(transcript_id == "ENST00000615513.4"), aes(x = rev(as.numeric(position)), y = value)) +
   geom_line() +
   geom_segment(data = p53_cdkn1a %>% filter(Strand == "+", `-log10(P-value)` >= 2), 
-               aes(x=500-Start, xend=500-End,y=0.00025,yend=0.00025,
-                   color = `-log10(P-value)`, size = 4)) +
+               aes(x=488-Start, xend=488-End,y=-0.00001,yend=-0.00001,
+                   color = `-log10(P-value)`), size = 2, lineend = "round") +
   theme_bw() +
   xlab("distance to TSS (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
   ylab("affinity relative to perfect match")+
   ggtitle("P53 affinity across CDKN1A promoter")
 
@@ -212,6 +232,70 @@ ggplot(data = tss_scores_2 %>% filter(genes %in% other_transcripts), aes(x = rev
   ylab("affinity relative to perfect match")+
   ggtitle("P53 affinity across promoter")+
   facet_wrap(~genes)
+
+# TRIM22, the gene with the highest score (from all upregulated genes)
+ggplot(data = tss_scores_2 %>% filter(transcript_id == "ENST00000414641.5"), aes(x = rev(as.numeric(position)), y = value)) +
+  geom_line() +
+  theme_bw() +
+  xlab("distance to TSS (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+  ggtitle("P53 affinity across TRIM22 promoter")
+
+# Plot the same plot for the 6 highest scoring promoters
+highest_promoters <- tss_scores %>% arrange(desc(max)) %>% 
+  slice(1:6)
+highest_promoters <- highest_promoters$transcript_id
+
+## Import molotool.autosome.ru predicted P53 binding
+p53_CEP85L <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/CEP85L_P53.tsv") %>%
+  filter(Strand == "-") %>%
+  dplyr::select(`-log10(P-value)`, Start, End) %>%
+  mutate(TF = "ENST00000472713.1")
+p53_ENS <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/ENST00000565189.1_P53.tsv") %>%
+  filter(Strand == "+") %>%
+  dplyr::select(`-log10(P-value)`, Start, End) %>%
+  mutate(TF = "ENST00000565189.1")
+p53_MDM4 <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/MDM4_P53.tsv") %>%
+  filter(Strand == "+") %>%
+  dplyr::select(`-log10(P-value)`, Start, End) %>%
+  mutate(TF = "ENST00000507825.3")
+p53_SBF2 <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/SBF2_P53.tsv") %>%
+  filter(Strand == "-") %>%
+  dplyr::select(`-log10(P-value)`, Start, End) %>%
+  mutate(TF = "ENST00000527019.5")
+p53_TAFA2 <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/TAFA2_P53.tsv")%>%
+  filter(Strand == "-") %>%
+  dplyr::select(`-log10(P-value)`, Start, End) %>%
+  mutate(TF = "ENST00000416284.7")
+p53_TRIM22 <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/TRIM22_P53.tsv")%>%
+  filter(Strand == "+") %>%
+  dplyr::select(`-log10(P-value)`, Start, End) %>%
+  mutate(TF = "ENST00000414641.5")
+molo_scoring <- rbind(p53_CEP85L, p53_ENS, p53_MDM4, p53_SBF2, p53_TAFA2, p53_TRIM22)
+
+for (i in unique(molo_scoring$TF)) {
+  p<- ggplot(data = tss_scores %>% 
+         filter(transcript_id == i) %>%
+         melt(id.vars = c("genes", "ensembl_gene_id", "transcript_id",
+                          "chr", "TSS_position", "strand", "gene_id", 
+                          "expr_avg", "n_tissues", "promoter_start", 
+                          "start", "end", "width", "seq", "max", "nutlin"),
+                     variable.name = "position"), 
+       aes(x = rev(as.numeric(position)), y = value)) +
+  geom_line() +
+  geom_segment(data = molo_scoring %>% filter(TF == i), 
+               aes(x=488-Start, xend=488-End,y=-0.01,yend=-0.01,
+                   color = `-log10(P-value)`), size = 2, lineend = "round") +
+  theme_bw() +
+  xlab("distance to TSS (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+    ylim(-0.01,0.15)+
+  ggtitle("P53 affinity at the highest-scoring promoters", subtitle = i)
+  
+  print(p)
+}
 ```
 
 
@@ -221,7 +305,7 @@ ggplot(data = tss_scores_2 %>% filter(genes %in% other_transcripts), aes(x = rev
 
 
 # Load the reporter affinities 
-```{r}
+```{r, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Import data
 load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_per_position.Rda")
 
@@ -246,7 +330,7 @@ load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/reporter_aff
 
 
 
-```{r}
+```{r reporter_scoring, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 ## enrichmennt plot from -500bp to TSS
 load("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/cDNA_df.RData")
 cDNA_df <- cDNA_df %>%
@@ -257,8 +341,9 @@ reporter_scores <- merge(reporter_scores, cDNA_df, all = T)
 reporter_scores_sel <- reporter_scores %>%
   filter(neg_ctrls == "No", str_detect(affinity_id, "2|3"))
 
-reporter_scores_sel <- melt(reporter_scores_sel, variable.name = "position", value.name = "affinity",
-                              id.vars = c("neg_ctrls", "affinity_id", "reporter_id"))
+reporter_scores_sel <- melt(reporter_scores_sel, variable.name = "position", 
+                            value.name = "affinity",
+                            id.vars = c("neg_ctrls", "affinity_id", "reporter_id"))
 
 example_reporter <- 
   reporter_scores_sel[reporter_scores_sel$reporter_id %in%
@@ -276,6 +361,148 @@ ggplot(example_reporter, aes(x = as.numeric(position), y = affinity, color = aff
   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))+
   theme(legend.position = "bottom")
 ```
+Since the genomic promoter elements are not in the same affinity-range as the reporter sequences, it seems like a good idea to re-score different sequences that have stronger P53 binding sites. A good input for this would be P53 ChIP-peaks. I also want to include the top hits from the functional P53 screen from the Agami lab and published P53 reporter sequences (TF-seq, 13-copy, PUMA, ...) and my pMT02 reporter sequences. 
+
+## Extract stronger P53 binding genomic sequences
+```{r ChIP_extraction, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# I downloaded the .wig file from GSE47043, converted it to .bigwig and then to .bedgraph and then ran macs3 with standard settings 
+p53_sites <- read.delim("/DATA/usr/m.trauernicht/data/ChIP/GSM1146168_S_p53_ChIP-Seq_c5.0_l200_g30_peaks.narrowPeak", header = F)
+p53_sites <- p53_sites[-1,]
+names(p53_sites) <- c("chr", "start", "end", "name", "score", "strand", "signalValue", "pValue", "qValue", "peak")
+
+# Filter out chrM
+p53_sites <- p53_sites %>%
+  filter(chr != "chrM")
+
+# Filter out too long peaks
+p53_sites <- p53_sites %>%
+  mutate(length = end - start,
+         center = start + peak,
+         start = center - 1000,
+         end = center + 1000)
+
+# Extract genomic sequence matching the selected promoter_start to TSS locations
+gr <- makeGRangesFromDataFrame(p53_sites)
+library(BSgenome.Hsapiens.UCSC.hg19)
+
+p53_sites$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg19::Hsapiens, names = gr, as.character = T)
+## I could do some filtering based on the ChIP-peak score here
+p53_sites <- p53_sites %>%
+  dplyr::select(name, seq)
+
+# Add other sequences: pMT02 reporters
+pMT02_P53 <- ReadFasta("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/output/mt20210111_oligo_pool.fasta") %>%
+  filter(str_detect(name, "Trp53")) %>%
+  setnames("sequence", "seq")
+p53_sites <- rbind(p53_sites, pMT02_P53)
+
+
+# Add other sequences: published reporter sequences
+pMT09_P53 <- ReadFasta("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/gen-2/mt20210114_oligo_pool_gen2.fasta") %>%
+  filter(str_detect(name, "P53")) %>%
+  setnames("sequence", "seq")
+p53_sites <- rbind(p53_sites, pMT09_P53)
+
+
+# Add other sequences: Agami functional hits
+
+
+
+# ATAC-seq peaks in MCF7 cells (Nutlin-stimulated?)
+
+
+# Curated list of P53 targets (Nguyen et al. 2018, NAS, Supplementary Table ST8)
+# nguyen_p53_REs <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/ST8-p53 cistrome targets.csv") %>%
+#   filter(MCF7_Nutlin_p53_Aerts == "peak-up")
+# nguyen_p53_REs <- nguyen_p53_REs %>%
+#   mutate(p53RE.center = round((p53RE.start + p53RE.end) / 2),
+#          p53RE.start = p53RE.center - 11,
+#          p53RE.end = p53RE.center + 12)
+# p53_REs <- nguyen_p53_REs %>%
+#   dplyr::select(Chr, 'start' = p53RE.start, 'end' = p53RE.end, 'gene' = Current.p53.cistrome.Gene.Symbol)
+# library(BSgenome.Hsapiens.UCSC.hg19)
+# gr <- makeGRangesFromDataFrame(p53_REs)
+# 
+# p53_REs$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg19::Hsapiens, names = gr, as.character = T)
+
+p53_REs <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/haran_p53RE_curated.csv") %>%
+  mutate(re_seq = paste(substr(LHS.Sequence, 9, 10), FS.Sequence..oriented., substr(RHS.Sequence, 1, 2), sep = "")) %>%
+  dplyr::select("gene" = Gene.site.name, re_seq) %>%
+  unique()
+p53_REs <- p53_REs[-251,]
+
+
+
+
+
+
+
+
+
+
+
+
+# # Save file
+# save(p53_sites, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/mt20210317_p53_sites.RData")
+```
+
+
+
+
+# Compare calculated affinities to cluster-buster scores
+```{r cluster_buster, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Make a file with genomic REs and the chosen reporter REs 
+reporter_REs <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/TF_motifs.csv") %>%
+  filter(TF == "Trp53") %>%
+  mutate(seq.name = paste(TF, Affinity, sep = "_")) %>%
+  dplyr::select(seq.name, 'seq.text' = Motif)
+
+p53_REs <- p53_REs %>%
+  dplyr::select('seq.name' = gene, 'seq.text' = re_seq)
+
+p53_REs <- rbind(p53_REs, reporter_REs)
+dat2fasta(p53_REs, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_REs.fasta")  
+
+# cluster-buster code:
+# ./cbust -m 0 -c 0 -f 5 /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_pfms /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_REs.fasta > /DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_2.tsv
+
+
+# Scan with ~6 different p53 motifs - plot each mean score per affinity categorie in a quasirandom plot
+reporter_cbust_scores <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_2.tsv") %>%
+  setnames("# chrom", "gene") %>%
+  filter(strand == "+", cluster_or_motif == "motif", cluster_id_or_motif_name != "M11198_2.00_transfac",
+         cluster_id_or_motif_name != "MA0106.1_SELEX") %>%
+  group_by(gene, cluster_id_or_motif_name) %>%
+  top_n(1, cluster_or_motif_score) %>%
+  ungroup() %>%
+  dplyr::select(gene, 'pwm' = cluster_id_or_motif_name, 'score' = cluster_or_motif_score) %>%
+  unique()
+
+reporter_cbust_scores$response_element <- "genomic REs"
+reporter_cbust_scores$response_element[grep("Trp53", reporter_cbust_scores$gene)] <- gsub("Trp53_([0-4]{1})", "\\1", reporter_cbust_scores$gene[grep("Trp53", reporter_cbust_scores$gene)])
+reporter_cbust_scores$rel_score <- ave(reporter_cbust_scores$score, reporter_cbust_scores$pwm, FUN = function(x) x/max(x))
+reporter_cbust_scores$response_element[reporter_cbust_scores$response_element == "0"] <- "4_high-affinity reporter"
+reporter_cbust_scores$response_element[reporter_cbust_scores$response_element == "1"] <- "3_med-affinity reporter"
+reporter_cbust_scores$response_element[reporter_cbust_scores$response_element == "2"] <- "2_low-affinity reporter"
+reporter_cbust_scores$response_element[reporter_cbust_scores$response_element == "3"] <- "1_very_low-affinity reporter"
+reporter_cbust_scores$response_element[reporter_cbust_scores$response_element == "4"] <- "0_zero-affinity reporter"
+reporter_cbust_scores$cdkn1a <- "No"
+cdkn1a <- c("CDKN1A")
+reporter_cbust_scores$cdkn1a[grep(paste(cdkn1a, collapse = "|"), reporter_cbust_scores$gene)] <- "Yes"
+
+# Plot the motif score per affinity 
+colors <- c("black", "red")
+ggplot(reporter_cbust_scores, aes(y = rel_score, x = response_element, color = cdkn1a)) +
+  geom_quasirandom(dodge.width = 0.75) +
+  ylab("cluster-buster score relative to maximum per pwm") +
+  scale_color_manual(values = colors) +
+  theme_bw() +
+  coord_flip()
+```
+
+
+
+
 
 
 
