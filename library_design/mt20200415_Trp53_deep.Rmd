@@ -1170,7 +1170,7 @@ tib_pwm_position_connell_binary_top <- unique(tib_pwm_position_connell_binary_to
 
 # Order to see which TF binds to them
 tib_pwm_position_connell_binary_top <- tib_pwm_position_connell_binary_top[order(tib_pwm_position_connell_binary_top$cum_binding),]
-tib_pwm_position_connell_binary_top <- tib_pwm_position_connell_binary_top$space[1:6]
+tib_pwm_position_connell_binary_top <- tib_pwm_position_connell_binary_top$space[1:8]
 
 
 # convert to matrix - leave out id
@@ -1191,7 +1191,7 @@ heatmaply(tib_pwm_position_connellMatrix[, colSums(tib_pwm_position_connellMatri
 ## Select Connell spacers
 ```{r}
 ## Add spacers to df
-position_selected <- position[position$y %in% c("34", "227", "406"),] %>%
+position_selected <- position[position$y %in% c("34", "82", "91", "205", "227", "406", "445", "471"),] %>%
   dplyr::select(space, tf, y) %>% unique()
 position_selected$y <- c(1,1,2,2,3,3)
 for (i in 1:3){

@@ -156,7 +156,7 @@ ref_seq$insert <- gsub("(.*)[A-Z]{12}$", "\\1", ref_seq$sequence)
 pDNA_seq_files = list.files('/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/pDNA_insert_seq_2/results/',
                        full.names=T, patter='.*MT.*_counts.tsv')
 pDNA_prev_file = list.files('/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/pDNA_insert_seq/processed/',
-                            full.names=T, patter='.*MT.*_counts.tsv')
+                            full.names=T, pattern='.*MT.*_counts.tsv')
 pDNA_seq_files <- c(pDNA_seq_files, pDNA_prev_file)
 pDNA_seq <- lapply(pDNA_seq_files, fread, header = FALSE)
 pDNA_seq_files[1:4] <- gsub('_[CGAT]{8}-[CGAT]{8}_S[0-9]{1,2}', '', pDNA_seq_files)
@@ -309,12 +309,12 @@ match_bc <- match_bc[ !duplicated(match_bc$cond_bc), ]
 ## Identify the unmapped fraction
 match_bc$match <- "match"
 match_bc$match[is.na(match_bc$TF)] <- "no_match"
-
+match_bc$id <- 1:nrow(match_bc)
 
 for (i in seq(1,5,1)) {
   p<- ggplot(match_bc %>%
          filter(rpm > i) %>%
-         mutate(match_count = ave(rpm, match, condition, FUN = function(x) length(x)),
+         mutate(match_count = ave(id, match, condition, FUN = length),
                 match_count = 100*match_count/nrow(ref_seq_bc)) %>%
          dplyr::select(condition, match_count, match) %>%
          unique(), aes(x = match_count, y = condition, fill = match)) +
