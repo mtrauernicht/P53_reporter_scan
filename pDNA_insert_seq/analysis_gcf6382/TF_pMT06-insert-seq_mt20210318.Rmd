@@ -137,6 +137,8 @@ for (i in 1:length(pDNA_seq)) {
   }
 }
 
+
+
 # Convert to long df - write conditions under each other
 pDNA_seq <- melt(pDNA_seq_df, id.vars = "sequence",
               variable.name = "condition", value.name = "counts")
