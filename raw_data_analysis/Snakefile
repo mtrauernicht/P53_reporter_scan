@@ -13,7 +13,7 @@ include:
 
 rule all:
     input:
-        expand('/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results/{ecn}_barcode_counts.tsv', ecn = ECN)
+        expand('/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results_b12_d0/{ecn}_barcode_counts.tsv', ecn = ECN)
 
 
 # Extract barcodes from cDNA/pDNA SE fastq files
@@ -21,9 +21,9 @@ rule extract_barcodes_from_fq:
     input:
         fq = ECN_DIR + S1
     output:
-        tsv = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results/{ecn}_barcodes.tsv'
+        tsv = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results_b12_d0/{ecn}_barcodes.tsv'
     log:
-        '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/logs/{ecn}_extract_barcodes_from_fq.log'
+        '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/logs_b12_d0/{ecn}_extract_barcodes_from_fq.log'
     conda:
         '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/stimulation_2_gcf6301/raw_data_analysis/environment.yaml'
     script:
@@ -33,14 +33,14 @@ rule extract_barcodes_from_fq:
 
 rule cluster_ecn_barcodes:
     input:
-        starcode_in = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results/{ecn}_barcodes.tsv'
+        starcode_in = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results_b12_d0/{ecn}_barcodes.tsv'
     output:
-        ofn = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results/{ecn}_barcode_counts.tsv',
+        ofn = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/results_b12_d0/{ecn}_barcode_counts.tsv',
     log:
-        '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/logs/{ecn}_cluster_ecn_barcodes.log'
+        '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6301/logs_b12_d0/{ecn}_cluster_ecn_barcodes.log'
     conda:
         '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/stimulation_2_gcf6301/raw_data_analysis/environment.yaml'
     threads: 12
     shell:
-        'starcode --threads {threads} --print-clusters -i {input.starcode_in} --dist 2 | \
+        'starcode --threads {threads} --print-clusters -i {input.starcode_in} --dist 0 | \
         sort -k1,1 > {output.ofn}'
