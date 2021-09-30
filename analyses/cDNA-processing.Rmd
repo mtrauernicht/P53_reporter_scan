@@ -49,6 +49,7 @@ library(plotly)
 library(randomForest)
 library(glmnet)
 library(glmnetUtils)
+library(jtools)
 ```
 
 
@@ -232,122 +233,94 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Import processed bc counts from the preprocessing step
-cDNA_df <- read.csv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6502/results/mt20210701_reporter_activity_filt.csv", header = T) 
+cDNA_df <- read.csv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/gcf6502/results/mt20210819_reporter_activity_filt.csv", header = T) 
 cDNA_df <- cDNA_df[!is.na(cDNA_df$tf),]
 cDNA_df$activity[is.na(cDNA_df$activity)] <- 0
 
+# Remove outliers and recalculate mean activities
+cDNA_df <- cDNA_df %>%
+  filter(outlier == "No") %>%
+  mutate(reporter_activity = ave(reporter_activity, reporter_id, sample, FUN = function(x) mean(x)),
+         log_reporter_activity = log2(reporter_activity)) %>%
+  dplyr::select(-reporter_activity_sd)
 
-# Add annotations
-## Mark O'Connell controls
-cDNA_df$positive_ctrl <- "No"
-cDNA_df$positive_ctrl[cDNA_df$position == 60 | cDNA_df$position == 70] <- "Yes"
+
+# Change names
 cDNA_df$tf <- as.character(cDNA_df$tf)
 cDNA_df$condition[cDNA_df$condition == "MCF7_PFTa"] <- "MCF7_WT_PFTa"
 cDNA_df$condition[cDNA_df$condition == "MCF7_DMSO"] <- "MCF7_WT_DMSO"
 cDNA_df$condition[cDNA_df$condition == "MCF7_Nutlin"] <- "MCF7_WT_Nutlin"
 
+# Remove gcf6501 KO data because it looks like P53 regained activity there
+cDNA_df <- cDNA_df %>%
+  filter(sample != "MCF7_KO_DMSO_r1_gcf6501", sample != "MCF7_KO_DMSO_r2_gcf6501")
+cDNA_df <- cDNA_df %>%
+  filter(sample != "MCF7_KO_Nutlin_r1_gcf6501", sample != "MCF7_KO_Nutlin_r2_gcf6501")
+cDNA_df$sample[cDNA_df$sample == "MCF7_KO_DMSO_r1_gcf6412"] <- "MCF7_KO_DMSO_r1_gcf6501"
+cDNA_df$gcf[cDNA_df$sample == "MCF7_KO_DMSO_r1_gcf6501"]  <- "gcf6501"
 
-### I saw that the KO and the WT reporter activities are drastically different
-### Hypothetically, the random reporters should have the same baseline in all conditions
-# Therefore: I will now scale the reporter activities to the same level based on the random reporters
+# Check if the conditions are scaled correctly
+ggplot(cDNA_df %>% 
+         filter(neg_ctrls == "Yes", str_detect(tf, "53"), str_detect(condition, "MCF")) %>% 
+         dplyr::select(tf, condition, reporter_activity, reporter_id, gcf, promoter) %>% 
+         unique(), 
+       aes(x = condition, y = reporter_activity, color = tf)) + 
+  geom_quasirandom(dodge.width = 0.75) + 
+  scale_color_brewer(palette = "Dark2") + 
+  theme_bw() + 
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  facet_grid(promoter~gcf)
+
+
+
+### In the barcode-preprocessing script I already scaled the data so that the negative controls would have the same counts in all conditions
+# Now I want to compute the enrichment over the inactive ones to center the data around 1 (1 = inactive)
 cDNA_df_neg <- cDNA_df %>%
-  dplyr::select(tf, sample, reporter_activity, reporter_id, neg_ctrls, rand_promoter, outlier, promoter) %>%
-  filter(neg_ctrls == "Yes", outlier == "No") %>%
+  dplyr::select(tf, condition, reporter_activity, reporter_id, motif_id, gcf, promoter) %>%
   mutate(tf = gsub("_.*", "", tf)) %>%
-  unique() %>% 
-  group_by(sample, promoter, tf) %>%
+  filter(motif_id == "4_4_4_4", promoter == "random") %>%
+  unique() %>%
+  group_by(condition, gcf) %>%
   mutate(reporter_activity = mean(reporter_activity)) %>%
   ungroup() %>%
   dplyr::select(-reporter_id) %>%
   unique() %>%
-  dplyr::select("background_activity" = reporter_activity, sample, promoter, tf) 
+  dplyr::select("background_activity" = reporter_activity, condition, gcf) %>%
+  unique()
 
 cDNA_df <- cDNA_df %>%
   mutate(tf = gsub("_.*", "", tf))
 cDNA_df <- merge(cDNA_df, cDNA_df_neg)
 cDNA_df <- cDNA_df %>%
-  mutate(reporter_activity_norm = reporter_activity / background_activity)
+  mutate(reporter_activity_norm = reporter_activity / background_activity,
+         activity_norm = activity / background_activity)
+
+# Assign which pDNA library was used for which gcf
+cDNA_df$pDNA_library <- "lib_1"
+#cDNA_df$pDNA_library[cDNA_df$gcf == "gcf6412" | cDNA_df$gcf == "gcf6501"] <- "lib_2"
+cDNA_df$pDNA_library[cDNA_df$gcf == "gcf6501"] <- "lib_2"
+
+# # Remove outlier sample: MCF7_WT_DMSO_r1_gcf6412
+# cDNA_df <- cDNA_df %>%
+#   filter(sample != "MCF7_WT_DMSO_r1_gcf6412")
 
 # Compute means per sample
-cDNA_df$reporter_activity_condition <- ave(cDNA_df$reporter_activity_norm, cDNA_df$condition, cDNA_df$reporter_id, 
+cDNA_df$reporter_activity_condition <- ave(cDNA_df$reporter_activity_norm, cDNA_df$condition, cDNA_df$reporter_id, cDNA_df$pDNA_library,
                                            FUN = function(x) mean(x))
 cDNA_df$reporter_activity_sample <- ave(cDNA_df$reporter_activity_norm, cDNA_df$sample, cDNA_df$reporter_id, 
                                            FUN = function(x) mean(x))
 
 # Check if the conditions are scaled correctly
 ggplot(cDNA_df %>% 
-         filter(neg_ctrls == "Yes", outlier == "No") %>% 
-         dplyr::select(tf, sample, reporter_activity_sample, reporter_id) %>% 
+         filter(tf == "P53", neg_ctrls == "Yes", str_detect(condition, "MCF")) %>% 
+         dplyr::select(tf, sample, reporter_activity_sample, reporter_id, gcf, promoter) %>% 
          unique(), 
        aes(x = sample, y = reporter_activity_sample, color = tf)) + 
   geom_quasirandom(dodge.width = 0.75) + 
   scale_color_brewer(palette = "Dark2") + 
   theme_bw() + 
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5))
-
-
-# Annotate affinity ids
-cDNA_df <- cDNA_df
-cDNA_df$affinity_id <- "0_mixed_any"
-cDNA_df$affinity_id[cDNA_df$affinity_pos1 == 0 & cDNA_df$affinity_pos2 == 0 & cDNA_df$affinity_pos3 == 4 & cDNA_df$affinity_pos4 == 4] <- "6_high_start"
-cDNA_df$affinity_id[cDNA_df$affinity_pos1 == 4 & cDNA_df$affinity_pos2 == 4 & cDNA_df$affinity_pos3 == 0 & cDNA_df$affinity_pos4 == 0] <- "7_high_end"
-cDNA_df$affinity_id[cDNA_df$affinity_pos1 == 3 & cDNA_df$affinity_pos2 == 3 & cDNA_df$affinity_pos3 == 3 & cDNA_df$affinity_pos4 == 3] <- "2_very_low_only"
-cDNA_df$affinity_id[cDNA_df$affinity_pos1 == 0 & cDNA_df$affinity_pos2 == 0 & cDNA_df$affinity_pos3 == 0 & cDNA_df$affinity_pos4 == 0] <- "5_high_only"
-cDNA_df$affinity_id[cDNA_df$affinity_pos1 == 1 & cDNA_df$affinity_pos2 == 1 & cDNA_df$affinity_pos3 == 1 & cDNA_df$affinity_pos4 == 1] <- "4_med_only"
-cDNA_df$affinity_id[cDNA_df$affinity_pos1 == 2 & cDNA_df$affinity_pos2 == 2 & cDNA_df$affinity_pos3 == 2 & cDNA_df$affinity_pos4 == 2] <- "3_low_only"
-cDNA_df$affinity_id[cDNA_df$affinity_pos1 == 4 & cDNA_df$affinity_pos2 == 4 & cDNA_df$affinity_pos3 == 4 & cDNA_df$affinity_pos4 == 4] <- "1_null_only"
-
-# Add affinity parameters
-## Activity vs. cumulative predicted affinity
-affinity_df <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/mt20201123_affinity.csv", header = T, stringsAsFactors = F)
-affinity_df$affinity[affinity_df$id == 4] <- 0
-affinity_df$TF[affinity_df$TF == "Trp53"] <- "P53"
-affinity_df$TF[affinity_df$TF == "Gr"] <- "GR"
-
-cDNA_df$tf[cDNA_df$tf == "Trp53"] <- "P53"
-cDNA_df$tf[cDNA_df$tf  == "Gr"] <- "GR"
-
-### Complicated way of adding cum_affinity information to the df
-for (i in unique(cDNA_df$affinity_pos1)) {
-  for (j in unique(cDNA_df$affinity_pos2)) {
-    for (k in unique(cDNA_df$affinity_pos3)) {
-      for (l in unique(cDNA_df$affinity_pos4)) {
-        for (m in unique(affinity_df$TF)) {
-    cDNA_df$cum_affinity[cDNA_df$affinity_pos1 == i & cDNA_df$affinity_pos2 == j & cDNA_df$affinity_pos3 == k &
-                         cDNA_df$affinity_pos4 == l & cDNA_df$tf == m] <- 
-      affinity_df$affinity[affinity_df$id == i & affinity_df$TF == m] +
-      affinity_df$affinity[affinity_df$id == j & affinity_df$TF == m] +
-      affinity_df$affinity[affinity_df$id == k & affinity_df$TF == m] +
-      affinity_df$affinity[affinity_df$id == l & affinity_df$TF == m]
-        }
-      }
-    }
-  }
-}
-
-### Also add the ddG and max_aff information
-cDNA_df <- cDNA_df %>%
-  group_by(reporter_id) %>%
-  mutate(ddG = affinity_pos1 + affinity_pos2 + affinity_pos3 + affinity_pos4,
-         max_aff = max(affinity_pos1,affinity_pos2,affinity_pos3,affinity_pos4),
-         cum_affinity = cum_affinity/4 *100,
-         cum_affinity = round(cum_affinity, 2))
-
-### Add affinity values for each reporter
-reporter_affinity_p53 <- read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/p53scores.tsv") %>%
-  dplyr::select('reporter_id_2' = Name, SumAffinity)
-
-reporter_affinity_p53_complete <-
-  read_tsv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/p53scores_complete.tsv") %>%
-  dplyr::select('reporter_id_3' = Name, 'reporter_affinity' = SumAffinity)
-
-cDNA_df <- cDNA_df %>%
-  mutate(reporter_id_2 = gsub("^.*_(.*?_).*","\\1", reporter_id),
-         reporter_id_2 = gsub(reporter_id_2, "", reporter_id),
-         reporter_id_3 = paste(reporter_id, "_bc_", oligo.barcode, sep = ""))
-
-cDNA_df <- merge(cDNA_df, reporter_affinity_p53, all = T)
-cDNA_df <- merge(cDNA_df, reporter_affinity_p53_complete, all = T)
+  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+  facet_grid(gcf~promoter)
 ```
 
 ## Analysis
@@ -355,22 +328,226 @@ cDNA_df <- merge(cDNA_df, reporter_affinity_p53_complete, all = T)
 ### First insights into data distribution - reporter activity distribution plots
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 ## save favorite colors
-colors_diverse <- c("#006D77", "#83C5BE", "#EDF6F9", "#FFDDD2", "#E29578")
+colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51")
 colors_diverse_2 <- c("#CB997E", "#DDBEA9", "#FFE8D6", "#B7B7A4", "#A5A58D", "#6B705C")
 colors_continous <- c("#CAD2C5", "#84A98C", "#52796F", "#354F52", "#2F3E46")
 colors_continous_2 <- c("#F8F9FA", "#E9ECEF", "#DEE2E6", "#CED4DA", "#ADB5BD", "#6C757D", "#495057", "#343A40", "#212529")
+reds <- c("#DD6B48", "#E38569", "#E7A08A", "#EDBBAB", "#EFC9BC")
 
-cDNA_df$pDNA_library <- "lib_1"
-cDNA_df$pDNA_library[cDNA_df$gcf == "gcf6412" | cDNA_df$gcf == "gcf6501"] <- "lib_2"
+
+## Check how well the scaled and normalized reporter activities correlate for the MCF conditions
+cDNA_df_cor_mcf <- cDNA_df %>%
+  filter(str_detect(sample, "MCF"), pDNA_library == "lib_2", str_detect(sample, "PFT", negate = T)) %>%
+  dplyr::select(reporter_id, reporter_activity_condition, condition) %>%
+  unique() %>%
+  spread(condition, reporter_activity_condition) %>%
+  column_to_rownames("reporter_id")
+
+
+cor_df <- cor(cDNA_df_cor_mcf, method = "pearson", use = "pairwise.complete.obs")
+
+pheatmap(cor_df, border_color = "black")
+
+# Correlation matrix plot
+boundaries <- seq(from = 0.8, by = 0.05, length.out = 4)
+ggpairs(cDNA_df_cor_mcf,
+                 upper = list(continuous = corColor),
+               lower = list(continuous = function(data, mapping, ...) {
+                   ggally_points(data = data, mapping = mapping, alpha = 0.1, size = 0.5) +
+                   geom_abline(slope = 1, lty = "dashed", col = "red") +
+                   theme_bw()}),
+               diag = list(continuous = function(data, mapping, ...) {
+                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
+                   theme_bw()})) +
+  ggtitle(paste("Correlation Between Replicates")) +
+  theme(text = element_text(size = 10)) +
+  xlab("Reporter activity") +
+  ylab("Reporter activity") 
+
+
+## Investigate more closely
+cDNA_df_cor_mcf <- cDNA_df_cor_mcf %>%
+  rownames_to_column("reporter_id")
+ctrls <- cDNA_df %>%
+  dplyr::select(reporter_id, neg_ctrls, tf, promoter, positive_ctrl, motif_id) %>%
+  unique()
+cDNA_df_cor_mcf <- merge(cDNA_df_cor_mcf, ctrls)
+
+ggplot(cDNA_df_cor_mcf %>% 
+         filter(tf == "P53", neg_ctrls == "No", motif_id != "4_4_4_4", promoter != "random") %>%
+         mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO) %>%
+         na.omit(), 
+       aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin)) +
+  geom_point(aes(color = cut(dif, c(0,2,5,10))), size = 1) +
+  geom_abline(linetype = "dashed") +
+  theme_pubr(border = T) +
+  #scale_color_viridis_b(breaks = c(1,3,6), begin = 0.2, option = "inferno")+
+  scale_color_manual(values = colors_continous)
+
+
+x <- cDNA_df_cor_mcf %>% 
+         filter(tf == "P53", motif_id != "4_4_4_4", promoter != "random") %>%
+         mutate(dif = MCF7_WT_DMSO/ MCF7_KO_DMSO) %>%
+         na.omit()
+
+x$dif[x$dif > 5] <- 5
+
+ggplot() +
+  geom_point(data = x %>% filter(neg_ctrls == "No"), aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin, color = x$dif[x$neg_ctrls == "No"])) +
+  scale_color_gradient(low = "#E6EEE8", high = colors_continous[2]) +
+  geom_point(data = x %>% filter(neg_ctrls == "Yes"), aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin), color = "black") +
+  geom_abline(linetype = "dashed") +
+  theme_pubr(border = T) 
+
+# Plotting specificity
+x <- cDNA_df_cor_mcf %>% 
+         filter(tf == "P53", motif_id != "4_4_4_4", promoter != "random") %>%
+         mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO) %>%
+         na.omit()
+
+ggplot(x,
+       aes(x = MCF7_WT_DMSO, y = dif, color = positive_ctrl)) +
+  geom_point()+
+  theme_pubr(border = T) +
+  scale_color_manual(values = c("black", "red")) +
+  geom_hline(yintercept = 5, linetype = "dashed")
+
+nutlin_specific <- x[x$dif >= 5 | x$positive_ctrl == "Yes",]
+
+ggplot(nutlin_specific,
+       aes(x = MCF7_WT_DMSO, y = dif, color = positive_ctrl)) +
+  geom_point()+
+  theme_pubr(border = T)
+
+
+x <- cDNA_df_cor_mcf %>% 
+         filter(tf == "P53", motif_id != "4_4_4_4", promoter != "random", neg_ctrls == "No") %>%
+         mutate(dif = MCF7_WT_DMSO / MCF7_KO_DMSO) %>%
+         na.omit()
+
+x$dmso_specific <- "No"
+x$dmso_specific[x$dif >= 30] <- "Yes"
+x <- x %>%
+  filter(MCF7_KO_DMSO >= 0.05)
+
+ggplot(x,
+       aes(x = MCF7_WT_DMSO, y = dif, color = positive_ctrl)) +
+  geom_point()+
+  scale_color_manual(values = c("black", "red")) +
+  geom_hline(yintercept = 30, linetype = "dashed") +
+  theme_pubr(border = T)
+
+
+### Super-reporter?
+super_reporter <- cDNA_df %>%
+  filter(str_detect(reporter_id,
+                    "P53_mCMV_p_0_s_7_d_10_bg_1_a1_3_a2_4_a3_3_a4_4|P53_minP_p_0_s_7_d_10_bg_3_a1_3_a2_4_a3_3_a4_4|P53_mCMV_p_0_s_1_d_10_bg_1_a1_2_a2_2_a3_2_a4_2|P53_minP_p_0_s_1_d_10_bg_3_a1_2_a2_2_a3_2_a4_2|P53_minP_p_70_s_7_d_10_bg_3_a1_0_a2_0_a3_0_a4_0|P53_mCMV_p_70_s_7_d_10_bg_1_a1_0_a2_0_a3_0_a4_0"),
+         str_detect(condition, "MCF7"),
+         str_detect(condition, "PFT", negate = T),
+         pDNA_library == "lib_2",
+         promoter != "random") %>%
+  dplyr::select(condition, reporter_activity_condition, promoter, background, positive_ctrl, motif_id) %>%
+  unique()
+
+ggplot(super_reporter, aes(x = motif_id, y = reporter_activity_condition, fill = condition)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7, color = "black") +
+  theme_pubr(border = T) +
+  scale_fill_manual(values = colors_continous) +
+  facet_wrap(~promoter, scales = "free")
+
+
+## Correlate replicates
+cDNA_df_cor_mcf <- cDNA_df %>%
+  filter(str_detect(sample, "MCF7"), pDNA_library == "lib_2", str_detect(sample, "PFT", negate = T)) %>%
+  dplyr::select(reporter_id, reporter_activity_sample, sample) %>%
+  unique() %>%
+  spread(sample, reporter_activity_sample)
+cDNA_df_cor_mcf <- merge(cDNA_df_cor_mcf, ctrls)
+
+ggplot(cDNA_df_cor_mcf %>%
+         filter(tf == "P53", positive_ctrl == "No"),
+       aes(x = MCF7_DMSO_r1_gcf6501, y = MCF7_DMSO_r2_gcf6501, color = neg_ctrls)) +
+  geom_point() +
+  scale_color_manual(values = c(colors_continous[2], "black"))+
+  theme_pubr(border = T)
+
+ggplot(cDNA_df_cor_mcf %>%
+         filter(tf == "P53", positive_ctrl == "No"),
+       aes(x = MCF7_Nutlin_r1_gcf6501, y = MCF7_Nutlin_r2_gcf6501, color = neg_ctrls)) +
+  geom_point() +
+  scale_color_manual(values = c(colors_continous[2], "black"))+
+  theme_pubr(border = T)
+
+## Prove that the KO sample is good enough
+cDNA_df_cor_mcf$ctrl_reporters <- "No"
+cDNA_df_cor_mcf$ctrl_reporters[cDNA_df_cor_mcf$tf == "GR" & cDNA_df_cor_mcf$promoter == "mCMV" & cDNA_df_cor_mcf$neg_ctrls == "Yes"] <- "Yes"
+
+  
+ggplot(cDNA_df_cor_mcf %>%
+           filter(tf == "P53" | ctrl_reporters == "Yes", positive_ctrl == "No"),
+       aes(x = MCF7_KO_DMSO_r1_gcf6501, y = MCF7_DMSO_r1_gcf6501, color = ctrl_reporters)) +
+  geom_point() +
+  scale_color_manual(values = c(colors_continous[2], "black")) +
+  theme_pubr(border = T)
+
+ggplot(cDNA_df_cor_mcf %>%
+           filter(tf == "P53" | ctrl_reporters == "Yes", positive_ctrl == "No"),
+       aes(x = MCF7_DMSO_r2_gcf6501, y = MCF7_DMSO_r1_gcf6501, color = ctrl_reporters)) +
+    geom_point() +
+    scale_color_manual(values = c(colors_continous[2], "black"))+
+    theme_pubr(border = T)
+
+## Show that 4 copies + 7 bp spacing is not the ideal set
+cDNA_df_cor_mcf <- cDNA_df %>%
+  filter(str_detect(sample, "MCF"), str_detect(sample, "KO", negate = T), pDNA_library == "lib_2", str_detect(sample, "PFT", negate = T),
+         tf == "P53", neg_ctrls == "No", positive_ctrl == "No") %>%
+  dplyr::select(reporter_id, reporter_activity_condition, condition, spacing, n_sites, promoter, motif_id) %>%
+  unique()
+
+cDNA_df_cor_mcf$design <- "alt"
+cDNA_df_cor_mcf$design[cDNA_df_cor_mcf$n_sites == 4 & cDNA_df_cor_mcf$spacing == 7] <- "common"
+
+ggplot(cDNA_df_cor_mcf %>% 
+         filter(motif_id != "4_4_4_4", promoter == "mCMV") %>%
+         na.omit(), 
+       aes(x = design, y = reporter_activity_condition, fill = condition)) +
+  geom_violin(position = position_dodge(0.75)) +
+  theme_pubr(border = T) +
+  #scale_color_viridis_b(breaks = c(1,3,6), begin = 0.2, option = "inferno")+
+  scale_fill_manual(values = colors_continous)
+
+
+
+## Reporter activity per condition, compared to negative and positive controls
+data <- cDNA_df %>%
+           dplyr::select(reporter_activity_condition, positive_ctrl, promoter, condition, neg_ctrls, outlier, affinity_id, tf, condition, pDNA_library, reporter_id) %>%
+           filter(promoter != "random", str_detect(condition, "MCF"), str_detect(condition, "PFT", negate = T), tf == "P53", pDNA_library == "lib_2", 
+                  affinity_id != "1_null_only", str_detect(condition, "KO_Nutlin", negate = T)) %>%
+           ungroup() %>%
+           unique()
+
+
+ggplot(data, 
+       aes(y = reporter_activity_condition, x = condition)) + 
+    geom_quasirandom(data = data %>% filter(neg_ctrls == "No"), color = reds[1]) + 
+  geom_quasirandom(data = data %>% filter(neg_ctrls == "Yes"), color = reds[3]) +
+  #geom_quasirandom(data = data %>% filter(positive_ctrl == "Yes"), color = "black") + 
+    xlab("condition") + 
+  ylab("reporter activity") +
+    theme_pubr(border = T)
+
+
+
 
 ## reporter activity distribution - highlight negative motif controls
 ggplot(cDNA_df %>%
-           dplyr::select(reporter_activity_sample, positive_ctrl, promoter, sample, neg_ctrls, outlier, affinity_id, tf, gcf, condition) %>%
-           filter(positive_ctrl == "No", promoter != "random", outlier == "No", str_detect(sample, "MCF"), tf == "P53",
+           dplyr::select(reporter_activity_condition, positive_ctrl, promoter, condition, neg_ctrls, outlier, affinity_id, tf, condition, pDNA_library) %>%
+           filter(positive_ctrl == "No", promoter != "random", str_detect(condition, "MCF"), str_detect(condition, "PFT", negate = T),
+                  tf == "P53", pDNA_library == "lib_2", 
                   affinity_id != "1_null_only") %>%
            ungroup() %>%
            unique(), 
-       aes(color = neg_ctrls, y = reporter_activity_sample, x = condition)) + 
+       aes(color = neg_ctrls, y = reporter_activity_condition, x = condition)) + 
     geom_quasirandom(dodge.width = 0.75, alpha = 0.4) + 
     geom_boxplot(position = position_dodge(0.75), alpha = 0.4)+
   scale_color_manual(values = colors_continous[seq(1, length(colors_continous), 2)]) +
@@ -379,12 +556,64 @@ ggplot(cDNA_df %>%
     labs(title = "reporter activity distribution - library 1 vs library 2") +
     theme_bw()+
     theme(text = element_text(size = 12)) + 
-    facet_wrap(~gcf) +
   coord_flip()
 
 ## reporter activity distribution - compare promoters
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No",
+         filter(neg_ctrls == "No",
+                str_detect(condition, "MCF7_WT"), motif_id != "4_4_4_4", tf == "P53", pDNA_library == "lib_2", str_detect(condition, "PFT", negate = T)) %>%
+         dplyr::select(condition, reporter_activity_condition, reporter_id, positive_ctrl, promoter, tf) %>%
+         unique(),
+       aes(x = promoter, y = reporter_activity_condition, color = condition)) + 
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_boxplot(position = position_dodge(0.75), alpha = 0.7)+
+  xlab("") + 
+  ylab("reporter activity (a.u.)") +
+  labs(title = "reporter activity distribution per minimal promoter") +
+  scale_color_manual(values = colors_continous) +
+  theme_pubr(border = T)
+
+## reporter activity distribution - enrichment over scrambled per minimal promoter 
+x <- cDNA_df %>%
+         filter(str_detect(condition, "MCF7_WT"), motif_id != "4_4_4_4", tf == "P53", pDNA_library == "lib_2", str_detect(condition, "PFT", negate = T)) %>%
+         dplyr::select(condition, reporter_activity_condition, reporter_id, positive_ctrl, promoter, tf, neg_ctrls) %>%
+         unique()
+
+
+x$reporter_activity_condition[x$promoter == "minP"] <- x$reporter_activity_condition[x$promoter == "minP"] /
+  mean(x$reporter_activity_condition[x$promoter == "minP" & x$neg_ctrls == "Yes"])
+
+x$reporter_activity_condition[x$promoter == "mCMV"] <- x$reporter_activity_condition[x$promoter == "mCMV"] /
+  mean(x$reporter_activity_condition[x$promoter == "mCMV" & x$neg_ctrls == "Yes"])
+
+x$reporter_activity_condition[x$promoter == "random"] <- x$reporter_activity_condition[x$promoter == "random"] /
+  mean(x$reporter_activity_condition[x$promoter == "random" & x$neg_ctrls == "Yes"])
+
+ggplot(x %>% filter(neg_ctrls == "No"),
+       aes(x = promoter, y = reporter_activity_condition, color = condition)) + 
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_boxplot(position = position_dodge(0.75), alpha = 0.7)+
+  xlab("") + 
+  ylab("reporter activity (a.u.)") +
+  labs(title = "reporter activity distribution per minimal promoter") +
+  scale_color_manual(values = colors_continous) +
+  theme_pubr(border = T)
+
+x <- x %>%
+  filter(neg_ctrls == "No") %>%
+  mutate(reporter_activity_condition = ave(reporter_activity_condition, promoter, condition, FUN = function(x) mean(x))) %>%
+  dplyr::select(reporter_activity_condition, promoter, condition) %>%
+  unique()
+
+ggplot(x, aes(x = promoter, y = reporter_activity_condition, fill = condition)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7, color = "black")+
+  scale_fill_manual(values = colors_continous) +
+  theme_pubr(border = T)
+
+
+## reporter activity distribution - compare promoters - only gcf6501
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", gcf == "gcf6501", str_detect(condition, "PFT", negate = T), 
                 str_detect(condition, "MCF"), affinity_id != "1_null_only", tf == "P53") %>%
          dplyr::select(condition, reporter_activity_sample, reporter_id, positive_ctrl, promoter, gcf, tf) %>%
          unique(),
@@ -396,12 +625,11 @@ ggplot(cDNA_df %>%
   labs(title = "reporter activity distribution per minimal promoter") +
   scale_color_manual(values = colors_continous[seq(1, length(colors_continous), 2)]) +
   theme_bw()+
-  facet_wrap(~gcf) + 
   coord_flip()
 
 ## reporter activity distribution - positive control
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No",
+         filter(neg_ctrls == "No",
                 str_detect(condition, "MCF"), affinity_id != "1_null_only", tf == "P53", promoter == "mCMV") %>%
          dplyr::select(condition, reporter_activity_sample, reporter_id, positive_ctrl, promoter, gcf, tf) %>%
          unique(),
@@ -416,10 +644,26 @@ ggplot(cDNA_df %>%
   facet_wrap(~gcf) + 
   coord_flip()
 
+## reporter activity distribution - positive control - only minP and gcf6501
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", gcf == "gcf6501", str_detect(condition, "PFT", negate = T), 
+                str_detect(condition, "MCF"), affinity_id != "1_null_only", tf == "P53", promoter == "minP") %>%
+         dplyr::select(condition, reporter_activity_sample, reporter_id, positive_ctrl, promoter, gcf, tf) %>%
+         unique(),
+       aes(x = condition, y = reporter_activity_sample, color = positive_ctrl)) + 
+  geom_quasirandom(dodge.width = 0.75) +
+  geom_boxplot(position = position_dodge(0.75), alpha = 0.7)+
+  xlab("") + 
+  ylab("reporter activity (a.u.)") +
+  labs(title = "reporter activity distribution per minimal promoter") +
+  scale_color_manual(values = colors_continous[seq(1, length(colors_continous), 2)]) +
+  theme_bw()+
+  coord_flip()
+
 ## Activity per affinity group
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
-                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[2-3]_"), tf == "P53") %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
+                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[1,3,5,7,9]_"), tf == "P53") %>%
          dplyr::select(tf, reporter_activity_sample, background, reporter_id, condition, affinity_id, gcf) %>%
          unique(), 
        aes(x = affinity_id, y = reporter_activity_sample, color = condition)) +
@@ -435,8 +679,8 @@ ggplot(cDNA_df %>%
 
 ## activity per spacing at different affinities
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
-                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[2-3]_"), background == 1, position == 0, tf == "P53") %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
+                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[1,3,5,7,9]_"), background == 1, position == 0, tf == "P53") %>%
          dplyr::select(tf, reporter_activity_sample, spacing, reporter_id, condition, affinity_id, gcf) %>% 
          unique() %>%
          mutate(reporter_activity_sample = ave(reporter_activity_sample, reporter_id, condition, gcf, FUN = function(x) mean(x))) %>%
@@ -452,25 +696,427 @@ ggplot(cDNA_df %>%
   scale_fill_manual(values = colors_continous)+
   facet_grid(gcf~affinity_id)
 
+## activity per spacing at different affinities - lib 2 all data combined
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", pDNA_library == "lib_2", str_detect(sample, "PFT", negate = T),
+                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[1,3,5,7]{1}_"), str_detect(affinity_id, "11_high_mid", negate = T),
+                position == 0, tf == "P53") %>%
+         dplyr::select(tf, reporter_activity_condition, spacing, reporter_id, condition, affinity_id) %>% 
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, affinity_id, condition, spacing, FUN = function(x) mean(x))) %>%
+         unique(), 
+       aes(x = spacing, y = reporter_activity_condition, color = condition, fill = condition)) +
+  geom_point() +
+  geom_smooth()+
+  theme_pubr(border = T) +
+  ggtitle("reporter activity per spacing")+
+  xlab("spacing length between motifs (bp)")+
+  ylab("reporter activity (a.u.)")+
+  scale_color_manual(values = colors_continous)+
+  scale_fill_manual(values = colors_continous)+
+  facet_wrap(~affinity_id, nrow = 1) +
+  scale_x_continuous(breaks = seq(0,10,1))
+
+
+## activity per spacing at different affinities - only low_affinity, background 3
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", promoter != "random", positive_ctrl == "No", pDNA_library == "lib_2", str_detect(sample, "PFT", negate = T),
+                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[7]_"), position == 0, tf == "P53") %>%
+         dplyr::select(tf, reporter_activity_condition, spacing, reporter_id, condition, affinity_id, background, promoter) %>% 
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, affinity_id, condition, background, promoter, spacing, FUN = function(x) mean(x))) %>%
+         unique(), 
+       aes(x = spacing, y = reporter_activity_condition, color = condition, fill = condition)) +
+  geom_point() +
+  geom_smooth(se = F)+
+  theme_pubr(border = T) +
+  ggtitle("reporter activity per spacing")+
+  xlab("spacing length between motifs (bp)")+
+  ylab("reporter activity (a.u.)")+
+  scale_color_manual(values = colors_continous)+
+  scale_fill_manual(values = colors_continous)+
+  facet_grid(promoter~background, scales = "free") +
+  scale_x_continuous(breaks = seq(0,10,1))
+
+
+## correlate minP and mCMV reporter activities
+data <- cDNA_df %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", promoter != "random", motif_id != "4_4_4_4",
+         str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), 
+         tf == "P53", pDNA_library == "lib_2") %>%
+  dplyr::select(tf, reporter_activity_condition, n_sites, motif_id, condition, reporter_id_2, background, promoter) %>% 
+  unique() %>%
+  spread(promoter, reporter_activity_condition) %>% 
+  na.omit()
+
+# reporters <- sample(data$reporter_id_2, 300)
+# data <- data[data$reporter_id_2 %in% reporters,]
+
+ggplot(data, aes(x = minP, y = mCMV)) +
+  geom_point(size = 1, aes(color = factor(background))) +
+  geom_smooth(method = "lm", aes(color = factor(background), fill = factor(background))) +
+  geom_abline(slope = mean(data$mCMV)/mean(data$minP), linetype = "dashed") +
+  theme_pubr(border = T) +
+  scale_color_manual(values = c("#000000","#666666", "#999999")) +
+  scale_fill_manual(values = c("#000000","#666666", "#999999"))
+
+
+## minimal promoters background activity
+data <- cDNA_df %>%
+  filter(neg_ctrls == "Yes", positive_ctrl == "No",
+         str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), 
+         tf == "P53", pDNA_library == "lib_2") %>%
+  dplyr::select(tf, reporter_activity_condition, n_sites, motif_id, condition, reporter_id_2, background, promoter) %>% 
+  unique() %>%
+  na.omit()
+
+ggplot(data, aes(x = promoter, y = reporter_activity_condition)) +
+  geom_quasirandom() +
+  geom_boxplot(aes(fill = promoter)) +
+  scale_fill_manual(values = c("#F6D289", "#ECD9B1", "#FBEDD0"))+
+  theme_pubr(border = T)
+
+# reporters with 0bp spacing
+data <- cDNA_df %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", promoter != "random", motif_id != "4_4_4_4", spacing == 0,
+         str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), 
+         tf == "P53", pDNA_library == "lib_2") %>%
+  dplyr::select(tf, reporter_activity_condition, n_sites, motif_id, condition, reporter_id_2, background, promoter) %>% 
+  unique()%>%
+  spread(promoter, reporter_activity_condition) %>% 
+  na.omit()
+
+ggplot(data, aes(x = minP, y = mCMV)) +
+  geom_point(aes(color = factor(background))) +
+  geom_smooth(se = F, method = "lm", aes(color = factor(background), fill = factor(background))) +
+  geom_abline(slope = mean(data$mCMV)/mean(data$minP), linetype = "dashed") +
+  theme_pubr(border = T) +
+  scale_color_manual(values = c("#000000","#666666", "#999999")) +
+  scale_fill_manual(values = c("#000000","#666666", "#999999"))
+
+
+## activity per spacing - mean over all affinities
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", pDNA_library == "lib_2", str_detect(sample, "PFT", negate = T),
+                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[1,3,5,7]_"), position == 0, tf == "P53") %>%
+         dplyr::select(tf, reporter_activity_condition, spacing, condition, background, affinity_id) %>% 
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, affinity_id, condition, background, spacing, FUN = function(x) mean(x))) %>%
+         unique(), 
+       aes(x = spacing, y = reporter_activity_condition, color = condition, fill = condition)) +
+  geom_quasirandom() +
+  geom_smooth(method = "loess")+
+  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 5, label.y = 8) +
+  theme_pubr(border = T) +
+  ggtitle("reporter activity per spacing")+
+  xlab("spacing length between motifs (bp)")+
+  ylab("reporter activity (a.u.)")+
+  scale_color_manual(values = rev(reds[seq(1, length(reds), 3)]))+
+  scale_fill_manual(values = rev(reds[seq(1, length(reds), 3)]))+
+  scale_x_continuous(breaks = seq(0,10,1))
+
+
+## activity for different number of binding sites
+data <- cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", promoter == "mCMV", 
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), str_detect(affinity_id, "[7-9]_"), 
+                tf == "P53", spacing == 7, pDNA_library == "lib_2") %>%
+         dplyr::select(tf, reporter_activity_condition, n_sites, motif_id, condition, affinity_id, gcf) %>% 
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, motif_id, condition, FUN = function(x) mean(x))) %>%
+         unique()
+
+ggplot(data, 
+       aes(x = n_sites, y = reporter_activity_condition, color = condition)) +
+  geom_point(position = position_dodge(0.75))+
+  theme_pubr(border = T) +
+  geom_label(data = data %>% 
+               filter(n_sites != 0, n_sites != 4) %>%
+               dplyr::select(reporter_activity_condition, motif_id, condition, n_sites) %>%
+               arrange(desc(reporter_activity_condition)) %>% 
+               group_by(n_sites) %>% 
+               slice_head(n=3), 
+             aes(label = motif_id), 
+             nudge_x = -.3) +
+  ggtitle("reporter activity vs number of binding sites")+
+  xlab("number of low-affinity binding sites")+
+  ylab("reporter activity (a.u.)")+
+  scale_color_manual(values = colors_continous)
+
+## similar but as bar plot, zoomed in on the last gcf
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter != "random", 
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), str_detect(affinity_id, "[7-9]_"), 
+                background == 1, tf == "P53", spacing == 7) %>%
+         dplyr::select(tf, reporter_activity_condition, n_sites, condition, reporter_id, promoter) %>% 
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, n_sites, promoter, condition, FUN = function(x) median(x))) %>%
+         unique(), 
+       aes(x = n_sites, y = reporter_activity_condition, fill = condition)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7, color = "black")+
+  theme_pubr(border = T, legend = "right") +
+  ggtitle("reporter activity vs number of binding sites")+
+  xlab("number of low-affinity binding sites")+
+  ylab("reporter activity (a.u.)")+
+  scale_fill_manual(values = colors_continous) +
+  facet_wrap(~promoter)
+
+## bar plot as before - but only fair comparisons (remove the positioning effect)
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV", 
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), str_detect(motif_id, "4_4_4_4|4_4_4_3|4_4_3_3|4_3_3_3|3_3_3_3"), 
+                tf == "P53", spacing == 7) %>%
+         dplyr::select(tf, reporter_activity_condition, n_sites, condition, reporter_id, promoter) %>% 
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, n_sites, promoter, condition, FUN = function(x) mean(x))) %>%
+         unique(), 
+       aes(x = n_sites, y = reporter_activity_condition, fill = condition)) +
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7, color = "black")+
+  theme_pubr(border = T) +
+  ggtitle("reporter activity vs number of binding sites")+
+  xlab("number of low-affinity binding sites")+
+  ylab("reporter activity (a.u.)")+
+  scale_fill_manual(values = colors_continous)
+
 ## activity per affinity
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7,
-                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[2-3]_"), pDNA_library == "lib_1") %>%
-         dplyr::select(tf, reporter_activity_sample, background, reporter_id, condition, affinity_id, gcf) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, tf == "P53",
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), 
+                str_detect(affinity_id, "[1,3,5,7,9]_"), str_detect(affinity_id, "11_high_mid", negate = T), pDNA_library == "lib_2") %>%
+         dplyr::select(tf, reporter_activity_condition, background, reporter_id, condition, affinity_id) %>%
          unique(), 
-       aes(x = affinity_id, y = reporter_activity_sample, color = condition)) +
-  geom_quasirandom(dodge.width = .75)+
-  geom_boxplot(alpha = .4, position = position_dodge(.75)) + 
-  theme_bw() +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
+       aes(x = affinity_id, y = reporter_activity_condition)) +
+  geom_boxplot(position = position_dodge(.75), aes(fill = condition), alpha = 0.7) +
+  geom_quasirandom(dodge.width = .75, aes(color = affinity_id, group = condition)) +
+  theme_pubr(border = T) +
   xlab("") +
-  scale_color_manual(values = colors_continous[seq(3, length(colors_continous), 2)])+
-  ggtitle("activity per affinity (P53-mCMV only)")
+  scale_color_manual(values = reds) +
+  scale_fill_manual(values = colors_continous[c(1,2)]) +
+  ggtitle("activity per affinity (P53-mCMV only)") + 
+  stat_compare_means(method = "t.test") 
+
+
+## impact of background sequence
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter != "random", 
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), str_detect(affinity_id, "[9]_", negate = T), 
+                tf == "P53") %>%
+         dplyr::select(tf, reporter_activity_condition, background, reporter_id, condition, affinity_id, promoter) %>% 
+         unique(), aes(x = condition, y = reporter_activity_condition, color = factor(background))) +
+  geom_quasirandom(dodge.width = .75) +
+  geom_boxplot(position = position_dodge(.75), alpha = .8)+
+  scale_color_manual(values = c("#000000","#666666", "#999999"))+
+  theme_pubr(border = T) +
+  labs(title = "reporter activity per background")+
+  xlab("background sequence")+
+  ylab("reporter activity")+
+  facet_wrap(~promoter, scales = "free")+ 
+  stat_compare_means(method = "t.test") 
+
+
+## Activity per predicted reporter affinity
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV",
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", spacing == 7, background == 1, position == 0, n_sites == 4, str_detect(affinity_id, "[1,2,3,4,5,6,7]{1}_"),
+                str_detect(affinity_id, "10_high_start|11_high_mid|12_high_end", negate = T)) %>%
+         dplyr::select(reporter_activity_condition, condition, SumAffinity, reporter_id) %>%
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, condition, SumAffinity,
+                                                  FUN = function(x) mean(x))) %>%
+         unique() %>%
+         arrange(SumAffinity) %>%
+         group_by(condition) %>%
+         mutate(SumAffinity = 1:length(SumAffinity)),
+       aes(x = SumAffinity, y = reporter_activity_condition, color = condition, fill = condition))+
+  geom_point() +
+  scale_fill_manual(values = colors_continous) +
+  scale_color_manual(values = colors_continous) +
+  geom_smooth()+
+  theme_pubr(border = T) +
+  ylab("reporter activity (a.u.)")+
+  xlab("reporter affinity rank (increasing)")+
+  labs(title = "reporter activity per affinity")
+
+
+## The same but now the difference between DMSO and Nutlin
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV",
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", spacing == 7, background == 1, position == 0, n_sites == 4, str_detect(affinity_id, "[1,2,3,4,5,6,7]{1}_"),
+                str_detect(affinity_id, "10_high_start|11_high_mid|12_high_end", negate = T)) %>%
+         dplyr::select(reporter_activity_condition, condition, SumAffinity, reporter_id) %>%
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, condition, SumAffinity,
+                                                  FUN = function(x) mean(x))) %>%
+         unique() %>%
+         arrange(SumAffinity) %>%
+         group_by(condition) %>%
+         mutate(SumAffinity = 1:length(SumAffinity)) %>%
+         spread(condition, reporter_activity_condition) %>%
+         mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO),
+       aes(x = SumAffinity, y = dif)) +
+  geom_point() +
+  geom_smooth(color = colors_continous[2])+
+  theme_pubr(border = T) +
+  ylab("reporter activity Nutlin/DMSO")+
+  xlab("reporter affinity rank (increasing)")+
+  labs(title = "reporter activity per affinity")
+
+
+## DMSO vs Nutlin depending on reporter affinity
+x <- cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "minP",
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", spacing == 7, background == 1, position == 0, n_sites == 4, str_detect(affinity_id, "[1,2,3,4,5,6,7]{1}_"),
+                str_detect(affinity_id, "10_high_start|11_high_mid|12_high_end", negate = T)) %>%
+         dplyr::select(reporter_activity_condition, condition, SumAffinity, reporter_id, affinity_id) %>%
+         unique() %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, condition, SumAffinity,
+                                                  FUN = function(x) mean(x))) %>%
+         unique() %>%
+         arrange(SumAffinity) %>%
+         group_by(condition) %>%
+         mutate(SumAffinity = 1:length(SumAffinity)) %>%
+         spread(condition, reporter_activity_condition) %>%
+         mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO)
+
+x$copies <- "mixed"
+x$copies[grep("[1,3,5,7]_", x$affinity_id)] <- "non_mixed"
+
+ggplot(x,
+       aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin, color = SumAffinity, shape = copies)) +
+  geom_point(size = 2) +
+  scale_color_gradient2(low = "grey", mid = "#F9E9E4", high = reds[1], midpoint = 24) +
+  geom_abline(linetype = "dashed")+
+  theme_pubr(border = T) +
+  labs(title = "reporter activity per affinity")
+
+
+
+## investigate special reporters with only two consensus sites
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV", 
+                str_detect(condition, "MCF7"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", spacing == 7, str_detect(affinity_id, "other|high_end|high_start")) %>%
+         dplyr::select(reporter_activity_condition, condition, reporter_id, motif_id) %>%
+         unique(),
+       aes(x = motif_id, y = reporter_activity_condition, color = condition))+
+  geom_quasirandom(dodge.width = .75) +
+  geom_boxplot(position = position_dodge(.75), alpha = .8)+
+  theme_bw() +
+  ylab("reporter activity (a.u.)")+
+  xlab("reporter affinity rank (increasing)")+
+  labs(title = "reporter activity per affinity")+
+  facet_wrap(~condition, nrow = 2)
+
+## compare all reporters with at least one high-affinity binding site
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV", position == 0, 
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T), spacing == 7,
+                tf == "P53", str_detect(motif_id, "0_0_0_0|0_4_4_0|4_4_0_0|0_0_4_4|4_0_0_4")) %>%
+         dplyr::select(reporter_activity_condition, condition, motif_id) %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, condition, motif_id, FUN = function(x) mean(x))) %>%
+         unique(),
+       aes(x = motif_id, y = reporter_activity_condition, fill = condition))+
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7, color = "black")+
+  theme_pubr(border = T) +
+  ylab("reporter activity (a.u.)")+
+  xlab("motif ID")+
+  scale_fill_manual(values = colors_continous)
+
+
+## disruption of activity by adding high-affinity binding sites
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV", position == 0, spacing == 7, 
+                str_detect(condition, "MCF7_WT_Nutlin"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", str_detect(motif_id, "3_3_3_3|0_0_3_3|4_4_3_3|0_0_4_4|3_3_4_4|4_4_4_4|4_4_0_0|3_3_0_0|0_0_0_0|0_3_3_0|0_4_4_0|3_4_4_3")) %>%
+         dplyr::select(reporter_activity_condition, condition, motif_id) %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, motif_id, condition, FUN = function(x) mean(x))) %>%
+         unique(),
+       aes(x = motif_id, y = reporter_activity_condition, fill = condition))+
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7, color = "black")+
+  theme_pubr(border = T) +
+  ylab("reporter activity (a.u.)")+
+  xlab("motif ID") +
+  scale_x_discrete(limits = rev) +
+  scale_fill_manual(values = colors_continous[2])
+
+## disruption of activity by adding high-affinity binding sites
+ggplot(cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "minP", position == 0, spacing == 7, 
+                str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", str_detect(motif_id, "3_3_3_3|0_0_3_3|3_3_0_0|0_0_0_0|0_3_3_0")) %>%
+         dplyr::select(reporter_activity_condition, condition, motif_id) %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, motif_id, condition, FUN = function(x) mean(x))) %>%
+         unique(),
+       aes(x = motif_id, y = reporter_activity_condition, fill = condition))+
+  geom_bar(stat = "identity", position = position_dodge(0.8), width = 0.7, color = "black")+
+  theme_pubr(border = T) +
+  ylab("reporter activity (a.u.)")+
+  xlab("motif ID") +
+  scale_x_discrete(limits = rev) +
+  scale_fill_manual(values = colors_continous)
+
+## Is the activity lower when the higher affinity binding site is further from the TSS?
+x <- cDNA_df %>%
+         filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV", position == 0, spacing == 7,
+                str_detect(condition, "MCF7_WT_Nutlin"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", str_detect(motif_id, "2_3_3_3|3_3_3_2|1_1_1_0|0_1_1_1|2_2_2_1|1_2_2_2|2_2_3_3|3_3_2_2|1_1_2_2|2_2_1_1|1_1_0_0|0_0_1_1")) %>%
+         dplyr::select(reporter_activity_condition, condition, reporter_id, motif_id, affinity_id, SumAffinity) %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, motif_id, condition, FUN = function(x) mean(x)),
+                SumAffinity = round(SumAffinity, 2)) %>%
+         unique()
+x$positioning <- "proximal"
+x$positioning[grep("2_3_3_3|0_1_1_1|1_2_2_2|2_2_3_3|1_1_2_2|0_0_1_1", x$motif_id)] <- "distal"
+x <- x %>%
+  dplyr::select(-motif_id, -reporter_id) %>%
+  unique()
+
+ggplot(x,
+       aes(x = positioning, y = reporter_activity_condition))+
+  geom_boxplot(alpha = 0.4)+
+  geom_abline()+
+  theme_pubr(border = T)+ 
+  stat_compare_means() 
+
+## Can I quantify this somehow else?
+cDNA_df_2 <- cDNA_df
+cDNA_df_2$positioning <- "other"
+cDNA_df_2$positioning[grep("2_3_3_3|0_1_1_1|1_2_2_2|2_2_3_3|0_0_1_1|1_1_2_2", cDNA_df_2$motif_id)] <- "high_end"
+cDNA_df_2$positioning[grep("3_3_3_2|1_1_1_0|2_2_2_1|3_3_2_2|1_1_0_0|2_2_1_1", cDNA_df_2$motif_id)] <- "high_start"
+cDNA_df_2$motif_id2 <- "other"
+cDNA_df_2$motif_id2[grep("2_3_3_3|3_3_3_2", cDNA_df_2$motif_id)] <- "2_one"
+cDNA_df_2$motif_id2[grep("0_1_1_1|1_1_1_0", cDNA_df_2$motif_id)] <- "0_one"
+cDNA_df_2$motif_id2[grep("1_2_2_2|2_2_2_1", cDNA_df_2$motif_id)] <- "1_one"
+cDNA_df_2$motif_id2[grep("2_2_3_3|3_3_2_2", cDNA_df_2$motif_id)] <- "2_two"
+cDNA_df_2$motif_id2[grep("0_0_1_1|1_1_0_0", cDNA_df_2$motif_id)] <- "0_two"
+cDNA_df_2$motif_id2[grep("1_1_2_2|2_2_1_1", cDNA_df_2$motif_id)] <- "1_two"
+
+ggplot(cDNA_df_2 %>%
+          filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", promoter == "mCMV", position == 0, spacing == 7,
+                str_detect(condition, "MCF7_WT_Nutlin"), str_detect(condition, "PFT", negate = T),
+                tf == "P53", str_detect(positioning, "high")) %>%
+         dplyr::select(reporter_activity_condition, positioning, motif_id2, background) %>%
+         mutate(reporter_activity_condition = ave(reporter_activity_condition, motif_id2, background, positioning, FUN = function(x) mean(x))) %>%
+         unique() %>%
+         spread(positioning, reporter_activity_condition) %>%
+         mutate(dif = high_start - high_end),
+       aes(x = high_end, y = high_start, color = dif))+ 
+  geom_point() +
+  geom_smooth(method = "lm") +
+  geom_abline(linetype = "dashed") +
+  theme_pubr(border = T) +
+  scale_color_viridis_b(option = "inferno") +
+  xlim(50, 210) +
+  ylim(50, 210)
+  
+
 
 
 ## Correlation between library 1 and library 2 data
 sp <- ggscatter(cDNA_df %>%
-         filter(outlier == "No", positive_ctrl == "No", 
+         filter(positive_ctrl == "No", 
                 str_detect(condition, "MCF7_WT"), tf == "P53") %>%
          dplyr::select(reporter_activity_sample, reporter_id, condition, pDNA_library, neg_ctrls) %>% 
          unique() %>%
@@ -487,21 +1133,26 @@ sp + stat_cor(method = "pearson", label.x = 0, label.y = 30) +
 ```
 
 
+
+
+
+
+
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 ## Make another df only focussing on MCF7 and compute differential activity
 cDNA_df_dif <- cDNA_df %>%
-  filter(str_detect(condition, "MCF")) %>%
-  dplyr::select(reporter_id, reporter_id_2, reporter_activity_condition, positive_ctrl, neg_ctrls, outlier, condition,
-                promoter, affinity_id, tf, affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4, background, 
-                position, spacing, ddG, max_aff, cum_affinity, SumAffinity, reporter_affinity) %>%
+  filter(str_detect(condition, "MCF"), str_detect(condition, "PFT", negate = T), pDNA_library == "lib_2") %>%
+  dplyr::select(-sample, -rep, -gcf, -reporter_activity_sample, -pDNA_counts_rpm_gcf6412, -pDNA_counts_rpm_gcf6501,
+                -starcode_counts, -rpm, -pDNA_counts_rpm_lib1, -activity, -reporter_activity, -log_activity, -log_reporter_activity,
+                -background_activity, -reporter_activity_norm, -n_outlier) %>%
   unique() %>%
-  dcast(...~condition, value.var = "reporter_activity_condition") %>%
+  spread(condition, reporter_activity_condition) %>%
   mutate(`MCF7_KO_DMSO` = `MCF7_KO_DMSO`/`MCF7_KO_DMSO`,
          `MCF7_KO_Nutlin` = `MCF7_KO_Nutlin`/`MCF7_KO_DMSO`,
          `MCF7_WT_DMSO` = `MCF7_WT_DMSO`/`MCF7_KO_DMSO`,
          `MCF7_WT_Nutlin` = `MCF7_WT_Nutlin`/`MCF7_KO_DMSO`) %>%
   dplyr::select(-`MCF7_KO_DMSO`) %>%
-  melt(id.vars = 1:20, variable.name = "condition", 
+  melt(id.vars = 1:28, variable.name = "condition", 
        value.name = "log_reporter_activity") %>%
   mutate(log_reporter_activity = log2(log_reporter_activity)) %>%
   na.omit()
@@ -518,7 +1169,7 @@ ggplot(data = cDNA_df_dif, aes(x = log_reporter_activity, fill = condition)) +
 ## reporter activity distribution - highlight negative motif controls
 ggplot(cDNA_df_dif %>%
            dplyr::select(log_reporter_activity, positive_ctrl, promoter, condition, neg_ctrls, outlier, affinity_id) %>%
-           filter(positive_ctrl == "No", promoter != "random", outlier == "No", str_detect(condition, "MCF"), 
+           filter(positive_ctrl == "No", promoter != "random", str_detect(condition, "MCF"), 
                   affinity_id != "1_null_only") %>%
            ungroup() %>%
            unique(), 
@@ -534,7 +1185,7 @@ ggplot(cDNA_df_dif %>%
 
 ## reporter activity distribution - compare promoters - normalized
 ggplot(cDNA_df_dif %>%
-           filter(outlier == "No", neg_ctrls == "No",
+           filter(neg_ctrls == "No",
                   str_detect(condition, "MCF"), affinity_id != "1_null_only") %>%
            dplyr::select(condition, log_reporter_activity, reporter_id, positive_ctrl, promoter) %>%
            unique(),
@@ -551,7 +1202,7 @@ ggplot(cDNA_df_dif %>%
 
 ## reporter activity per condition - positive control
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", 
+         filter(neg_ctrls == "No", promoter == "mCMV", 
                 str_detect(condition, "MCF"), affinity_id != "1_null_only") %>%
          dplyr::select(condition, log_reporter_activity, reporter_id, positive_ctrl) %>%
          unique(), 
@@ -567,7 +1218,7 @@ ggplot(cDNA_df_dif %>%
 
 ## activity per affinity at position 4
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
                 str_detect(condition, "MCF"), affinity_id != "1_null_only") %>%
          dplyr::select(tf, log_reporter_activity, affinity_pos4, reporter_id, condition) %>% 
          unique(),aes(x = as.character(affinity_pos4), y = log_reporter_activity, color = condition)) +
@@ -580,11 +1231,11 @@ ggplot(cDNA_df_dif %>%
 
 ## activity per spacing at different affinities
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
-                str_detect(condition, "MCF7-WT"), str_detect(affinity_id, "[2,3]_"), background == 1, position == 0) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
+                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[5,7]_"), background == 1, position == 0) %>%
          dplyr::select(tf, log_reporter_activity, spacing, reporter_id, condition, affinity_id) %>% 
          unique(), 
-       aes(x = spacing, y = log_reporter_activity, color = affinity_id, fill = affinity_id)) +
+       aes(x = spacing, y = log_reporter_activity, color = condition, fill = condition)) +
   geom_point()+
   geom_smooth()+
   theme_bw() +
@@ -593,11 +1244,11 @@ ggplot(cDNA_df_dif %>%
   ylab("reporter activity (a.u.)")+
   scale_color_manual(values = colors_continous[seq(3, length(colors_continous), 2)])+
   scale_fill_manual(values = colors_continous[seq(3, length(colors_continous), 2)])+
-  facet_wrap(~condition)
+  facet_wrap(~affinity_id)
 
 ## activity per position
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", 
+         filter(neg_ctrls == "No", promoter == "mCMV", 
                 str_detect(condition, "MCF"), affinity_id != "1_null_only") %>%
          dplyr::select(position, log_reporter_activity, reporter_id, condition, positive_ctrl) %>% 
          unique(), 
@@ -611,7 +1262,7 @@ ggplot(cDNA_df_dif %>%
 
 ## activity per background
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
                 str_detect(condition, "MCF"), affinity_id != "1_null_only", spacing == 7) %>%
          dplyr::select(tf, log_reporter_activity, background, reporter_id, condition) %>% 
          unique(), aes(x = factor(background), y = log_reporter_activity)) +
@@ -625,7 +1276,7 @@ ggplot(cDNA_df_dif %>%
 
 ## background per affinity
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
                 str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[1-3]_"), spacing == 7) %>%
          dplyr::select(tf, log_reporter_activity, background, reporter_id, condition, affinity_id) %>% 
          unique(), aes(x = affinity_id, y = log_reporter_activity, color = factor(background))) +
@@ -642,8 +1293,8 @@ ggplot(cDNA_df_dif %>%
 
 ## Activity per affinity group
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
-                str_detect(condition, "MCF7-WT")) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", 
+                str_detect(condition, "MCF7_WT")) %>%
          dplyr::select(tf, log_reporter_activity, background, reporter_id, condition, affinity_id) %>%
          unique(), 
        aes(x = affinity_id, y = log_reporter_activity, color = condition)) +
@@ -657,8 +1308,8 @@ ggplot(cDNA_df_dif %>%
 
 ## Activity per affinity group
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7,
-                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[2-3]_")) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7,
+                str_detect(condition, "MCF7_WT"), str_detect(affinity_id, "[5,7,9]_")) %>%
          dplyr::select(tf, log_reporter_activity, background, reporter_id, condition, affinity_id) %>%
          unique(), 
        aes(x = affinity_id, y = log_reporter_activity, color = condition)) +
@@ -672,7 +1323,7 @@ ggplot(cDNA_df_dif %>%
   
 ## Activity per ddG
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7,
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7,
                 str_detect(condition, "MCF"), affinity_id != "1_null_only") %>%
          dplyr::select(log_reporter_activity, reporter_id, condition, ddG) %>%
          unique(),
@@ -685,7 +1336,7 @@ ggplot(cDNA_df_dif %>%
 
 ## Activity per max_affinity
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7,
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7,
                 str_detect(condition, "MCF"), affinity_id != "1_null_only") %>%
          dplyr::select(log_reporter_activity, reporter_id, condition, max_aff) %>%
          unique(),
@@ -698,7 +1349,7 @@ ggplot(cDNA_df_dif %>%
 
 ## Activity per cumulative affinity
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
                 str_detect(condition, "MCF")) %>%
          dplyr::select(log_reporter_activity, reporter_id, condition, cum_affinity) %>%
          unique(),
@@ -715,7 +1366,7 @@ ggplot(cDNA_df_dif %>%
 
 ## Activity per predicted reporter affinity
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
                 str_detect(condition, "MCF")) %>%
          dplyr::select(log_reporter_activity, condition, SumAffinity) %>%
          unique() %>%
@@ -738,7 +1389,7 @@ ggplot(cDNA_df_dif %>%
 
 ## Activity per predicted reporter affinity - plot only the model
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
                 str_detect(condition, "MCF")) %>%
          dplyr::select(log_reporter_activity, condition, SumAffinity) %>%
          unique() %>%
@@ -762,7 +1413,7 @@ ggplot(cDNA_df_dif %>%
 
 ## Activity per predicted reporter affinity - now not only the affinity of the RE but the whole reporter
 ggplot(cDNA_df_dif %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
+         filter(neg_ctrls == "No", promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
                 str_detect(condition, "MCF")) %>%
          dplyr::select(log_reporter_activity, condition, reporter_affinity) %>%
          unique() %>%
@@ -787,7 +1438,7 @@ ggplot(cDNA_df_dif %>%
 ggplot(cDNA_df_dif %>%
          mutate(very_low_count = str_count(reporter_id, "3") - 2) %>%
          mutate(low_count = str_count(reporter_id, "2") - 1) %>%
-         filter(outlier == "No", neg_ctrls == "No", background == 1, promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
+         filter(neg_ctrls == "No", background == 1, promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
                 position == 0, very_low_count %in% c(1,2,3,4), low_count == 0, str_detect(condition, "MCF7-WT_Nutlin")) %>%
          dplyr::select(log_reporter_activity, condition, very_low_count, low_count) %>%
          mutate(log_reporter_activity = ave(log_reporter_activity, very_low_count, FUN = function(x) mean(x))) %>%
@@ -807,7 +1458,7 @@ ggplot(cDNA_df_dif %>%
          mutate(low_count = str_count(reporter_id, "2") - 1) %>%
          mutate(med_count = str_count(reporter_id, "1") - 3) %>%
          mutate(high_count = str_count(reporter_id, "0") - 2) %>%
-         filter(outlier == "No", neg_ctrls == "No", background == 1, promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
+         filter(neg_ctrls == "No", background == 1, promoter == "mCMV", positive_ctrl == "No", spacing == 7, 
                 position == 0, very_low_count %in% c(0,1,2,3,4), low_count == 0, med_count == 0, high_count == 0, 
                 str_detect(condition, "MCF7-WT_Nutlin")) %>%
          dplyr::select(reporter_id, log_reporter_activity, condition, very_low_count, low_count, med_count, high_count) %>%
@@ -843,7 +1494,7 @@ sp + stat_cor(method = "pearson", label.x = 150, label.y = 2) +
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Plot mean activites per affinity rank
 ggplot(cDNA_df_dif %>% 
-         filter(outlier == "No", neg_ctrls == "No", promoter != "random", positive_ctrl == "No", 
+         filter(neg_ctrls == "No", promoter != "random", positive_ctrl == "No", 
                 str_detect(condition, "MCF7_WT")) %>%
          dplyr::select(cum_affinity, condition, reporter_id, log_reporter_activity, promoter) %>%
          group_by(cum_affinity, condition, promoter) %>%
@@ -868,7 +1519,7 @@ ggplot(cDNA_df_dif %>%
 
 # Now plot the difference between Nutlin and DMSO
 ggplot(cDNA_df_dif %>% 
-         filter(outlier == "No", neg_ctrls == "No", promoter != "random", positive_ctrl == "No", 
+         filter(neg_ctrls == "No", promoter != "random", positive_ctrl == "No", 
                 str_detect(condition, "MCF7_WT")) %>%
          dplyr::select(cum_affinity, condition, reporter_id, log_reporter_activity, promoter) %>%
          group_by(cum_affinity, condition, promoter) %>%
@@ -898,14 +1549,14 @@ ggplot(cDNA_df_dif %>%
 Clustering of reporters to identify highest ranking ones
 ```{r}
 ## Heatmap clustering to identify nutlin-sensitive clusters and dmso-sensitive clusters
-cDNA_df_clust <- cDNA_df_dif %>% 
-  filter(outlier == "No", neg_ctrls == "No", positive_ctrl == "No", position == "0", 
-         spacing == "7", background == "1", promoter == "mCMV") %>%
-  dplyr::select(reporter_id_2, log_reporter_activity, condition) %>%
-  mutate(reporter_id_2 = gsub(".*_(a1.*)", "\\1", reporter_id_2)) %>%
+cDNA_df_clust <- cDNA_df %>% 
+  filter(tf == "P53", str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T),
+         neg_ctrls == "No", positive_ctrl == "No", position == "0", promoter != "random", pDNA_library == "lib_2") %>%
+  dplyr::select(reporter_id, reporter_activity_condition, condition) %>%
   unique() %>%
-  dcast(reporter_id_2 ~ condition, value.var = "log_reporter_activity") %>%
-  column_to_rownames(var = "reporter_id_2")
+  spread(condition, reporter_activity_condition) %>%
+  column_to_rownames(var = "reporter_id") %>% 
+  na.omit()
 
 # Plot cluster distance between measurements
 plot(hclust(dist(as.matrix(cDNA_df_clust))))
@@ -948,7 +1599,7 @@ cDNA_df_dif_2$cluster[cDNA_df_dif_2$positive_ctrl == "Yes"] <- 4
 
 
 ggplot(cDNA_df_dif_2 %>%
-         filter(cluster == 4, outlier == "No", neg_ctrls == "No",
+         filter(cluster == 4, neg_ctrls == "No",
          spacing == "7", background == "1", promoter == "mCMV", affinity_id != "1_null_only") %>%
          dplyr::select(condition, log_reporter_activity, reporter_id, positive_ctrl) %>%
          unique(), 
@@ -969,7 +1620,7 @@ Clustering of reporters to identify highest ranking ones - now also include the 
 ```{r}
 ## Heatmap clustering to identify nutlin-sensitive clusters and dmso-sensitive clusters
 cDNA_df_clust <- cDNA_df_dif %>% 
-  filter(outlier == "No", neg_ctrls == "No", positive_ctrl == "No", position == "0", 
+  filter(neg_ctrls == "No", positive_ctrl == "No", position == "0", 
          background == "1", promoter == "mCMV", affinity_id != "0_mixed_any", affinity_id != "1_null_only") %>%
   dplyr::select(reporter_id_2, log_reporter_activity, condition) %>%
   mutate(reporter_id_2 = gsub(".*_(s.*)", "\\1", reporter_id_2)) %>%
@@ -1017,7 +1668,7 @@ cDNA_df_dif_2$cluster[cDNA_df_dif_2$positive_ctrl == "Yes"] <- 4
 
 
 ggplot(cDNA_df_dif_2 %>%
-         filter(cluster == 4, outlier == "No", neg_ctrls == "No",
+         filter(cluster == 4, neg_ctrls == "No",
          spacing == "7", background == "1", promoter == "mCMV", affinity_id != "1_null_only") %>%
          dplyr::select(condition, log_reporter_activity, reporter_id, positive_ctrl) %>%
          unique(), 
@@ -1068,7 +1719,7 @@ cDNA_df <- cDNA_df %>%
 
 # Plot relative reporter activities for each condition per affinity
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV") %>%
+         filter(neg_ctrls == "No", promoter == "mCMV") %>%
          dplyr::select(cum_affinity, rel_reporter_activity, sample, reporter_id) %>%
          unique(),
        aes(x = factor(cum_affinity), y = rel_reporter_activity)) +
@@ -1081,7 +1732,7 @@ ggplot(cDNA_df %>%
   facet_wrap(~sample)
 
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", str_detect(sample,"MCF"), spacing == 7) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", str_detect(sample,"MCF"), spacing == 7) %>%
          dplyr::select(cum_affinity, rel_reporter_activity_condition, condition, reporter_id) %>%
          unique(),
        aes(x = factor(cum_affinity), y = rel_reporter_activity_condition)) +
@@ -1104,7 +1755,7 @@ ggplot(cDNA_df %>%
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Compare per affinity the reporter activity distributions per condition
 ggplot(cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV") %>%
+         filter(neg_ctrls == "No", promoter == "mCMV") %>%
          dplyr::select(cum_affinity, rel_reporter_activity_condition, condition, reporter_id) %>%
          unique(), 
        aes(x = condition, y = rel_reporter_activity_condition))+
@@ -1116,7 +1767,7 @@ ggplot(cDNA_df %>%
 
 ggplot(cDNA_df %>%
          dplyr::select(cum_affinity, rel_reporter_activity_condition, condition, reporter_id, outlier, neg_ctrls, promoter) %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF")) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF")) %>%
          unique(), 
        aes(x = condition, y = rel_reporter_activity_condition))+
   geom_quasirandom(alpha = 0.3, color =  "#2D3047") +
@@ -1129,7 +1780,7 @@ for (i in unique(cDNA_df$cum_affinity)){
   if (nrow(cDNA_df[cDNA_df$cum_affinity == i,]) > 1){
   p <- ggplot(cDNA_df[cDNA_df$cum_affinity == i,] %>%
          dplyr::select(cum_affinity, rel_reporter_activity_condition, condition, reporter_id, outlier, neg_ctrls, promoter) %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF")) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF")) %>%
          unique(), 
        aes(x = condition, y = rel_reporter_activity_condition))+
   geom_quasirandom(alpha = 0.3, color =  "#2D3047") +
@@ -1151,7 +1802,7 @@ for (i in unique(cDNA_df$cum_affinity)){
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 ggplot(cDNA_df %>%
          dplyr::select(affinity_id, rel_reporter_activity_condition, condition, reporter_id, outlier, neg_ctrls, promoter) %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF")) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF")) %>%
          unique(), 
        aes(x = affinity_id, y = rel_reporter_activity_condition))+
   geom_quasirandom(alpha = 0.3, color =  "#2D3047") +
@@ -1167,7 +1818,7 @@ ggplot(cDNA_df %>%
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Plot mean reporter activity per affinity per condition - connected line plot
 cDNA_df_aff<- cDNA_df %>%
-         filter(outlier == "No", neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF7")) %>%
+         filter(neg_ctrls == "No", promoter == "mCMV", str_detect(condition,"MCF7")) %>%
          dplyr::select(rel_reporter_activity_condition, condition, cum_affinity) %>%
          unique() %>%
          group_by(condition, cum_affinity) %>%
@@ -1314,136 +1965,124 @@ ggplot(cDNA_df_aff_wide_2 %>% group_by(cells) %>%
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 ## Rule of thumb for fitting models: e^n_features < n_observations -> I will try to fit 4 features for 114 observations
 
-## Subselect p53 only 
+## Subselect reporters
 cDNA_df_p53 <- cDNA_df %>%
-  filter(neg_ctrls == "No", positive_ctrl == "No", outlier == "No", str_detect(affinity_id, "[1-5]_"),
-         promoter == "mCMV", str_detect(condition, "MCF")) %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", tf == "P53",
+         position == 0, promoter != "random",
+         str_detect(affinity_id, "[1,3,5,7]_"), str_detect(condition, "MCF7_WT"), str_detect(condition, "PFT", negate = T)) %>%
   dplyr::select(reporter_id, condition, reporter_activity_condition, 
-                affinity_pos1,spacing, background) %>%
+                affinity_pos1, spacing, background, promoter) %>%
   mutate(spacing = as.factor(spacing),
          background = as.factor(background),
-         reporter_activity_condition = log2(reporter_activity_condition)) %>%
-  unique()
+         reporter_activity = ave(reporter_activity_condition, affinity_pos1, background, promoter, condition, spacing, FUN = function(x) mean(x)),
+         log_reporter_activity = log2(reporter_activity)) %>%
+  dplyr::select(-reporter_activity_condition, -reporter_activity) %>%
+  unique() 
+
 
 # Rename 0,1,2,3,4 in null, very-weak, weak, medium, strong
-replace <- data.frame("old" = c(0:4), "new" = c("_4_strong", "_3_medium", "_2_weak", "_1_very-weak", "_0_null"), stringsAsFactors=FALSE)
+replace <- data.frame("old" = c(0:4), "new" = c("motif 1", "motif 2", "motif 3", "motif 4", "motif 0"), stringsAsFactors=FALSE)
 for (i in unique(replace$old)) {
   cDNA_df_p53$affinity_pos1[cDNA_df_p53$affinity_pos1 == i] <- replace$new[replace$old == i]
 }
 
-## Explain which affinities are essential at which position to boost activity
-### Calculate expression variance
-exp_variance <- data.frame("feature" = c(colnames(cDNA_df_p53 %>% 
-                                                    dplyr::select(-reporter_id, -condition, -reporter_activity_condition)),
-                                         "Residuals"), stringsAsFactors=FALSE)
-
-prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53)), stringsAsFactors=FALSE)
-
-weight <- data.frame("feature" = merge(colnames(cDNA_df_p53 %>% 
-                                                  dplyr::select(-reporter_id, -condition, -reporter_activity_condition,
-                                                                -spacing, -background)),
-                                       unique(cDNA_df_p53$affinity_pos1), all = T)) %>%
-  mutate(feature = paste(feature.x, feature.y, sep = "")) %>% dplyr::select("feature") 
-
-weight_2 <- data.frame("feature" = merge(colnames(cDNA_df_p53 %>% 
-                                                  dplyr::select(spacing)),
-                                       unique(cDNA_df_p53$spacing), all = T)) %>%
-  mutate(feature = paste(feature.x, feature.y, sep = "")) %>% dplyr::select("feature")
-
-weight_3 <- data.frame("feature" = merge(colnames(cDNA_df_p53 %>% 
-                                                  dplyr::select(background)),
-                                       unique(cDNA_df_p53$background), all = T)) %>%
-  mutate(feature = paste(feature.x, feature.y, sep = "")) %>% dplyr::select("feature") 
-
-weight <- rbind(weight, weight_2, weight_3, "(Intercept)", stringsAsFactors=FALSE)
 
 
+## First for DMSO
+cDNA_df_p53_dmso <- cDNA_df_p53[,-1] %>% filter(cDNA_df_p53$condition == "MCF7_WT_DMSO")
+cDNA_df_p53_dmso$row <- rownames(cDNA_df_p53_dmso)
 
-cDNA_df_p53 <- cDNA_df_p53[order(cDNA_df_p53$condition),-1]
-cDNA_df_p53$row <- rownames(cDNA_df_p53)
+## Fitting the model
+x <- lm(log_reporter_activity ~ affinity_pos1 + spacing + background:promoter, cDNA_df_p53_dmso)
 
-for (i in unique(cDNA_df_p53$condition)) {
-  x <- lm(reporter_activity_condition ~ affinity_pos1 + spacing + background, 
-                     cDNA_df_p53[cDNA_df_p53$condition == i,])
-  y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
-  par(mfrow=c(2,2))
-  plot(x, main = i)
-  names(y) <- c("row", i)
-  y$id <- 1:nrow(y)
-  prediction <- merge(prediction,y, all = T)
+summ(x)
+par(mfrow=c(2,2))
+plot(x)
+
+# Get predicted activities per reporter
+y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(y) <- c("row", "reporter_activity_predicted")
+y$id <- 1:nrow(y)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53_dmso)), stringsAsFactors=FALSE)
+prediction <- merge(prediction,y, all = T) %>% 
+  dplyr::select(-id)
+cDNA_df_p53_dmso <- merge(cDNA_df_p53_dmso, prediction)
   
-  w <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column()
-  names(w) <- c("feature", i)
-  weight <- merge(weight,w, all = T)
-  
-  x <- anova(x) %>% rownames_to_column("feature") %>%
-    setnames("Sum Sq", "sum_sq") %>%
-    dplyr::select(feature, sum_sq) %>%
-    mutate(sum = sum(sum_sq)) %>%
-    mutate(rel_sum_sq = (sum_sq/sum)*100) %>%
-    setnames("rel_sum_sq", i)
-  x <- x[,c(1,4)]
-  
-  exp_variance <- merge(exp_variance, x)
-}
 
-
-## Prepare lm parameters for plotting
-exp_variance <- melt(exp_variance, variable.name = "condition")
-exp_variance$group <- "no residual"
-exp_variance$group[grep("Residual", exp_variance$feature)] <- "residual"
-prediction <- prediction %>% 
-  dplyr::select(-id) %>% 
-  melt(id.vars = "row", variable.name = "condition", value.name = "activity_predicted") %>% 
-  dplyr::select(-condition) %>% 
-  na.omit()
-cDNA_df_p53 <- merge(cDNA_df_p53, prediction)
+# What are the individual weights?
+weight <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column() %>% na.omit()
+names(weight) <- c("feature", "weight")
+references <- data.frame("feature" = c("affinity_pos1motif1", "spacing0", "background3:promoterminP"), 
+                         "weight" = c(0,0,0))
+weight <- rbind(weight, references)
 weight <- weight %>% filter(feature != "(Intercept)")
-weight <- melt(weight, variable.name = "condition")
-categorie <- "affinity_pos"
+categorie <- c("affinity_pos1", "spacing")
 weight$features <- gsub(paste(categorie, collapse="|"), "",weight$feature)
-feature <- weight$features
-feature <- gsub("^.{1}", "", feature)
-weight$cond <- gsub(paste(feature, collapse="|"), "", weight$feature)
-weight$value[is.na(weight$value)] <- 0
-weight$features <- gsub("^1_", "affinity_", weight$features)
+weight$cond <- gsub(paste(weight$features, collapse = "|"), "", weight$feature)
+weight$cond[weight$cond == ""] <- "background:promoter"
+weight$condition <- "DMSO"
 
-# Further plotting preparations
-exp_variance$value[exp_variance$feature == "Residuals"] <- 100 - exp_variance$value[exp_variance$feature == "Residuals"]
-exp_variance$feature <- revalue(exp_variance$feature, c("Residuals"="total"))
+
+## Now for Nutlin
+cDNA_df_p53_nutlin <- cDNA_df_p53[,-1] %>% filter(cDNA_df_p53$condition == "MCF7_WT_Nutlin")
+cDNA_df_p53_nutlin$row <- rownames(cDNA_df_p53_nutlin)
+
+## Fitting the model
+x <- lm(log_reporter_activity ~ affinity_pos1 + spacing + background:promoter, cDNA_df_p53_nutlin)
+
+summ(x)
+par(mfrow=c(2,2))
+plot(x)
+
+# Get predicted activities per reporter
+y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(y) <- c("row", "reporter_activity_predicted")
+y$id <- 1:nrow(y)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53_nutlin)), stringsAsFactors=FALSE)
+prediction <- merge(prediction,y, all = T) %>% 
+  dplyr::select(-id)
+cDNA_df_p53_nutlin <- merge(cDNA_df_p53_nutlin, prediction)
+cDNA_df_p53 <- rbind(cDNA_df_p53_nutlin, cDNA_df_p53_dmso)
+  
+
+# What are the individual weights?
+weight_nutlin <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column() %>% na.omit()
+names(weight_nutlin) <- c("feature", "weight")
+references <- data.frame("feature" = c("affinity_pos1motif1", "spacing0", "background3:promoterminP"), 
+                         "weight" = c(0,0,0))
+weight_nutlin <- rbind(weight_nutlin, references)
+weight_nutlin <- weight_nutlin %>% filter(feature != "(Intercept)")
+categorie <- c("affinity_pos1", "spacing")
+weight_nutlin$features <- gsub(paste(categorie, collapse="|"), "",weight_nutlin$feature)
+weight_nutlin$cond <- gsub(paste(weight_nutlin$features, collapse = "|"), "", weight_nutlin$feature)
+weight_nutlin$cond[weight_nutlin$cond == ""] <- "background:promoter"
+weight_nutlin$condition <- "Nutlin"
+weight <- rbind(weight, weight_nutlin)
+
+
 
 # Plotting
-ggplot(exp_variance, 
-       aes(x = reorder(feature, -value), y = value, fill = group)) +
-  scale_fill_manual(values = c("#1B998B", "#2D3047")) +
-  geom_bar(stat = "identity") + 
-  ylab("Variance explained (%)") + xlab("") + 
-  labs(title = "Linear variance modelling", 
-       subtitle = "Expression variance predicted by features") +
-  theme_bw() +
-  theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    guides(fill = F) + facet_wrap(~condition)
-
-ggscatter(cDNA_df_p53, x = "reporter_activity_condition", y = "activity_predicted",
+ggscatter(cDNA_df_p53, x = "log_reporter_activity", y = "reporter_activity_predicted", color = "condition", shape = "promoter",
           add = "reg.line",
-          add.params = list(color = "blue", fill = "lightgray"),
-          conf.int = TRUE, ylab = "Predicted log2-activity", size = 0.5,
-          xlab = "Average log2-activity") + 
-  theme_bw() + 
-  facet_wrap(~condition) +
-  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 0, label.y = 3)
+          add.params = list(color = "#84A98C", fill = "lightgray"),
+          conf.int = TRUE, ylab = "Predicted reporter activity",
+          xlab = "Average reporter activity") + 
+  theme_pubr(border = T)+
+  scale_color_manual(values = colors_continous)
+
+level_order <- c("affinity_pos1motif1", "affinity_pos1motif 2", "affinity_pos1motif 3", "affinity_pos1motif 4", "spacing0", "spacing1", "spacing2", 
+                 "spacing3", "spacing4", "spacing5", "spacing6", "spacing7", "spacing8", "spacing9", "spacing10", "background1:promotermCMV", "background2:promotermCMV",
+                 "background3:promotermCMV", "background1:promoterminP", "background2:promoterminP", "background3:promoterminP")
 
 ggplot(weight, 
-       aes(x = features, y = value, fill = cond)) +
-  scale_fill_manual(values = c("#1B998B", "#2D3047", "#FF9B71", "#ECDD7B", "#C2B2B4", "#A54657")) +
-  geom_bar(stat = "identity") + 
-  ylab("Weight") + xlab("") +
-  theme_bw() +
-  theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-    guides(fill = F) + 
-  facet_wrap(~condition)
+       aes(x = factor(feature, level = level_order), y = weight, fill = cond, group = condition)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.7, color = "black") + 
+  ylab("weight - reporter activity") +
+  xlab("") +
+  theme_pubr(border = T) +
+  scale_fill_manual(values = colors_continous_2[c(1,3,5,6)]) +
+  guides(fill = F)+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
 ```
 
 
@@ -1457,23 +2096,36 @@ ggplot(weight,
 
 
 
-
-
-
-
-### Explain expression differences betweeen the different affinities
+### Explain expression differences in the very-low affinity / zero-affinity mixed population
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
-## Rule of thumb for fitting models: e^n_features < n_observations -> I will try to fit 4 features for 114 observations
+## Rule of thumb for fitting models: e^n_features < n_observations
 
 ## Subselect p53 only 
 cDNA_df_p53 <- cDNA_df %>%
-  filter(neg_ctrls == "No", positive_ctrl == "No", outlier == "No", 
-         spacing == "7", background == "1", affinity_id == "0_mixed_any",
-         promoter == "mCMV", str_detect(condition, "MCF")) %>%
-  dplyr::select(reporter_id, condition, reporter_activity_condition, 
-                affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4) %>% 
-  mutate(reporter_activity_condition = log2(reporter_activity_condition)) %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", tf == "P53",
+         spacing == 7, str_detect(affinity_id, "[7-9]"), position == 0, 
+         promoter == "minP", str_detect(condition, "MCF7_WT_Nutlin"), str_detect(condition, "PFT", negate = T)) %>%
+  dplyr::select(reporter_id, condition, reporter_activity_condition,
+                affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4, motif_id, n_sites) %>% 
+  mutate(reporter_activity = ave(reporter_activity_condition, motif_id, condition, FUN = function(x) mean(x)),
+         log_reporter_activity = log2(reporter_activity)) %>%
+  dplyr::select(-reporter_id, - reporter_activity_condition) %>%
   unique()
+
+# cDNA_df_p53$motif_dist <- 0
+# cDNA_df_p53$motif_dist[grep("3_4_4$", cDNA_df_p53$motif_id)] <- 1
+# cDNA_df_p53$motif_dist[grep("3_4$", cDNA_df_p53$motif_id)] <- 2
+# cDNA_df_p53$motif_dist[grep("3$", cDNA_df_p53$motif_id)] <- 3
+
+cDNA_df_p53$highest_dist <- "0"
+cDNA_df_p53$highest_dist[grep("3_4_3", cDNA_df_p53$motif_id)] <- "1"
+cDNA_df_p53$highest_dist[grep("3_4_4_3", cDNA_df_p53$motif_id)] <- "1"
+
+#cDNA_df_p53$n_adjacent <- "0"
+#cDNA_df_p53$n_adjacent[grep("3_3", cDNA_df_p53$motif_id)] <- "2"
+#cDNA_df_p53$n_adjacent[grep("3_3_3", cDNA_df_p53$motif_id)] <- "3"
+
+#cDNA_df_p53$n_sites <- as.character(cDNA_df_p53$n_sites)
 
 # Rename 0,1,2,3,4 in null, very-weak, weak, medium, strong
 replace <- data.frame("old" = c(0:4), "new" = c("_4_strong", "_3_medium", "_2_weak", "_1_very-weak", "_0_null"), stringsAsFactors=FALSE)
@@ -1485,159 +2137,290 @@ for (i in unique(replace$old)) {
 }
 
 ## Explain which affinities are essential at which position to boost activity
-### Calculate expression variance
-exp_variance <- data.frame("feature" = c(colnames(cDNA_df_p53 %>% 
-                                                    dplyr::select(-reporter_id, -condition, -reporter_activity_condition)),
-                                         "Residuals"), stringsAsFactors=FALSE)
-
-prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53)), stringsAsFactors=FALSE)
-
-weight <- data.frame("feature" = merge(colnames(cDNA_df_p53 %>% 
-                                                  dplyr::select(-reporter_id, -condition, -reporter_activity_condition)),
-                                       unique(cDNA_df_p53$affinity_pos1), all = T)) %>%
-  mutate(feature = paste(feature.x, feature.y, sep = "")) %>% dplyr::select("feature") %>% 
-  rbind("(Intercept)", stringsAsFactors=FALSE)
-
-
-cDNA_df_p53 <- cDNA_df_p53[order(cDNA_df_p53$condition),-1]
+cDNA_df_p53 <- cDNA_df_p53[order(cDNA_df_p53$condition),] %>%
+  dplyr::select(-motif_id)
 cDNA_df_p53$row <- rownames(cDNA_df_p53)
 
-for (i in unique(cDNA_df_p53$condition)) {
-  x <- lm(reporter_activity_condition ~ affinity_pos1 +  affinity_pos2 + affinity_pos3 + affinity_pos4, 
-                     cDNA_df_p53[cDNA_df_p53$condition == i,])
-  y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
-  par(mfrow=c(2,2))
-  plot(x, main = i)
-  names(y) <- c("row", i)
-  y$id <- 1:nrow(y)
-  prediction <- merge(prediction,y, all = T)
-  
-  w <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column()
-  names(w) <- c("feature", i)
-  weight <- merge(weight,w, all = T)
-  
-  x <- anova(x) %>% rownames_to_column("feature") %>%
-    setnames("Sum Sq", "sum_sq") %>%
-    dplyr::select(feature, sum_sq) %>%
-    mutate(sum = sum(sum_sq)) %>%
-    mutate(rel_sum_sq = (sum_sq/sum)*100) %>%
-    setnames("rel_sum_sq", i)
-  x <- x[,c(1,4)]
-  
-  exp_variance <- merge(exp_variance, x)
-}
+## Fitting the model
+x <- lm(reporter_activity ~ n_sites + highest_dist + affinity_pos4, cDNA_df_p53)
 
+summ(x)
+par(mfrow=c(2,2))
+plot(x, main = i)
 
-## Prepare lm parameters for plotting
-exp_variance <- melt(exp_variance, variable.name = "condition")
+# Get predicted activities per reporter
+y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(y) <- c("row", "reporter_activity_predicted")
+y$id <- 1:nrow(y)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53)), stringsAsFactors=FALSE)
+prediction <- merge(prediction,y, all = T) %>% 
+  dplyr::select(-id)
+cDNA_df_p53 <- merge(cDNA_df_p53, prediction)
+  
+
+# What are the individual weights?
+weight <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(weight) <- c("feature", "weight")
+weight <- weight %>% filter(feature != "(Intercept)")
+categorie <- c("affinity_pos", "n_sites", "highest_dist")
+weight$features <- gsub(paste(categorie, collapse="|"), "",weight$feature)
+weight$cond <- gsub(paste(weight$features, collapse = "|"), "", weight$feature)
+  
+
+# How many percent do the different tested features explain?
+exp_variance <- anova(x) %>% rownames_to_column("feature") %>%
+  setnames("Sum Sq", "sum_sq") %>%
+  dplyr::select(feature, sum_sq) %>%
+  mutate(sum = sum(sum_sq)) %>%
+  mutate(rel_sum_sq = (sum_sq/sum)*100) %>%
+  setnames("rel_sum_sq", "percent") %>%
+  dplyr::select("feature", "percent")
+
 exp_variance$group <- "no residual"
 exp_variance$group[grep("Residual", exp_variance$feature)] <- "residual"
-prediction <- prediction %>% 
-  dplyr::select(-id) %>% 
-  melt(id.vars = "row", variable.name = "condition", value.name = "activity_predicted") %>% 
-  dplyr::select(-condition) %>% 
-  na.omit()
-cDNA_df_p53 <- merge(cDNA_df_p53, prediction)
-weight <- weight %>% filter(feature != "(Intercept)")
-weight <- melt(weight, variable.name = "condition")
-categorie <- "affinity_pos"
-weight$features <- gsub(paste(categorie, collapse="|"), "",weight$feature)
-feature <- weight$features
-feature <- gsub("^.{1}", "", feature)
-weight$cond <- gsub(paste(feature, collapse="|"), "", weight$feature)
-weight$value[is.na(weight$value)] <- 0
-
-# Further plotting preparations
-exp_variance$value[exp_variance$feature == "Residuals"] <- 100 - exp_variance$value[exp_variance$feature == "Residuals"]
+exp_variance$percent[exp_variance$feature == "Residuals"] <- 100 - exp_variance$percent[exp_variance$feature == "Residuals"]
 exp_variance$feature <- revalue(exp_variance$feature, c("Residuals"="total"))
+
 
 # Plotting
 ggplot(exp_variance, 
-       aes(x = reorder(feature, -value), y = value, fill = group)) +
+       aes(x = percent, y = reorder(feature, -percent), fill = group)) +
   scale_fill_manual(values = c("#1B998B", "#2D3047")) +
   geom_bar(stat = "identity") + 
-  ylab("Variance explained (%)") + xlab("") + 
+  xlab("Variance explained (%)") + 
+  ylab("") + 
   labs(title = "Linear variance modelling", 
        subtitle = "Expression variance predicted by features") +
-  theme_bw() +
+  theme_pubr(border = T) +
   theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    guides(fill = F) + facet_wrap(~condition)
+  guides(fill = F)
 
-ggscatter(cDNA_df_p53, x = "reporter_activity_condition", y = "activity_predicted",
+ggscatter(cDNA_df_p53, x = "reporter_activity", y = "reporter_activity_predicted",
           add = "reg.line",
-          add.params = list(color = "blue", fill = "lightgray"),
-          conf.int = TRUE, ylab = "Predicted log2-activity", size = 0.5,
-          xlab = "Average log2-activity") + 
-  theme_bw() + 
-  facet_wrap(~condition) +
-  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 0, label.y = 10)
+          add.params = list(color = "#84A98C", fill = "lightgray"),
+          conf.int = TRUE, ylab = "Predicted reporter activity", size = 3,
+          xlab = "Average reporter activity") + 
+  theme_pubr(border = T)+
+  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 0, label.y = 3)
 
 ggplot(weight, 
-       aes(x = features, y = value, fill = cond)) +
-  scale_fill_manual(values = c("#1B998B", "#2D3047", "#FF9B71", "#ECDD7B", "#C2B2B4", "#A54657")) +
-  ggtitle(i)+
-  geom_bar(stat = "identity") + 
-  ylab("Weight") + xlab("") +
-  theme_bw() +
-  theme(text = element_text(size = 12)) +
-  theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-    guides(fill = F) + 
-  facet_wrap(~condition)
-
-ggplot(weight %>% filter(str_detect(condition,"WT")), 
-       aes(x = features, y = value, fill = cond)) +
-    scale_fill_manual(values = c("#1B998B", "#2D3047", "#FF9B71", "#ECDD7B", "#C2B2B4", "#A54657")) +
-    geom_bar(stat = "identity") + 
-    ylab("Weight") + xlab("") +
-    theme_bw() +
-    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1)) +
-    guides(fill = F) + 
-    facet_wrap(~condition)
-
-
-
-ggplot(cDNA_df_p53 %>%
-         filter(str_detect(condition, "MCF7-WT"), str_detect(affinity_pos2, "[0,1,2]_")) %>%
-         dplyr::select(reporter_activity_condition, affinity_pos2, condition) %>%
-         unique(),
-       aes(x = condition, y = reporter_activity_condition, color = as.factor(affinity_pos2))) +
-  geom_quasirandom(dodge.width = 0.75) +
-  geom_boxplot(position = position_dodge(0.75), alpha = .4) +
-  scale_color_manual(values = colors)+
-  guides(fill = F)+
-  ylab("reporter activity (a.u.)")+
-  ggtitle("weak (green) vs very weak (black) motif at position 4")+
-  theme_bw()
-
-ggplot(cDNA_df_p53 %>%
-         filter(str_detect(condition, "MCF7-WT"), str_detect(affinity_pos1, "[0,1,2,3,4]_"),
-                str_detect(affinity_pos2, "[0,1,2,3,4]_"),str_detect(affinity_pos3, "[0,1,2,3,4]_"),
-                str_detect(affinity_pos4, "[0,1,2,3,4]_")) %>%
-         dplyr::select(reporter_activity_condition, affinity_pos1, affinity_pos2,affinity_pos3,affinity_pos4,condition) %>%
-         melt(id.vars = c("reporter_activity_condition", "condition"), 
-              variable.name = "affinity_pos", value.name = "affinity") %>%
-         unique(),
-       aes(x = condition, y = reporter_activity_condition, color = affinity_pos)) +
-  geom_quasirandom(dodge.width = 0.75) +
-  geom_boxplot(position = position_dodge(0.75), alpha = .4) +
-  scale_color_brewer(palette =  "Dark2")+
-  guides(fill = F)+
-  ylab("reporter activity (a.u.)")+
-  ggtitle("weak (green) vs very weak (black) motif at position 4")+
-  theme_bw() +
-  facet_wrap(~affinity)
-
-ggplot(x, aes(x = affinity_pos4, y = reporter_activity_condition)) +
-  geom_quasirandom()
-
-library(ggfortify)
-df <- iris[1:4]
-pca_res <- prcomp(df, scale. = TRUE)
-
-autoplot(pca_res)
+       aes(x = reorder(feature, -weight), y = weight)) +
+  geom_bar(stat = "identity", width = 0.7, fill = colors_continous[2], color = "black") + 
+  ylab("weight - reporter activity") +
+  xlab("") +
+  theme_pubr(border = T) +
+  guides(fill = F)
 ```
-*The site closest to the minimal promoter determines the activity. Can neighboring sites even inhibit this effect?*
+
+
+
+
+
+
+### Explain expression differences betweeen all other mixed populations - how does high affinity binding influence activity?
+```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+## Rule of thumb for fitting models: e^n_features < n_observations
+
+## Subselect p53 only - let's only go for 2-2 combinations for now to simplify the model
+cDNA_df_p53 <- cDNA_df %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", tf == "P53",
+         spacing == 7, str_detect(affinity_id, "[2,4,6]_"), position == 0, background == 1, n_sites == 4,
+         promoter == "mCMV", str_detect(condition, "MCF7_WT_Nutlin"), str_detect(condition, "PFT", negate = T)) %>%
+  dplyr::select(reporter_id, condition, reporter_activity_condition,
+                affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4, motif_id, n_sites, affinity_id,
+                SumAffinity) %>% 
+  mutate(reporter_activity = ave(reporter_activity_condition, motif_id, condition, FUN = function(x) mean(x)),
+         log_reporter_activity = log2(reporter_activity),
+         SumAffinity = round(SumAffinity, 2),
+         SumAffinity = as.character(SumAffinity)) %>%
+  dplyr::select(-reporter_id, - reporter_activity_condition) %>%
+  unique()
+
+cDNA_df_p53 <- cDNA_df_p53 %>%
+         filter(str_detect(motif_id, "2_3_3_3|3_3_3_2|1_1_1_0|0_1_1_1|2_2_2_1|1_2_2_2|2_2_3_3|3_3_2_2|1_1_2_2|2_2_1_1|1_1_0_0|0_0_1_1"))
+cDNA_df_p53$positioning <- "proximal"
+cDNA_df_p53$positioning[grep("2_3_3_3|0_1_1_1|1_2_2_2|2_2_3_3|1_1_2_2|0_0_1_1", cDNA_df_p53$motif_id)] <- "distal"
+
+## Explain which affinities are essential at which position to boost activity
+cDNA_df_p53 <- cDNA_df_p53[order(cDNA_df_p53$condition),] %>%
+  dplyr::select(-motif_id)
+cDNA_df_p53$row <- rownames(cDNA_df_p53)
+
+## Fitting the model
+x <- lm(reporter_activity ~ SumAffinity + positioning, cDNA_df_p53)
+
+summ(x)
+par(mfrow=c(2,2))
+plot(x, main = i)
+
+# Get predicted activities per reporter
+y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(y) <- c("row", "reporter_activity_predicted")
+y$id <- 1:nrow(y)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53)), stringsAsFactors=FALSE)
+prediction <- merge(prediction,y, all = T) %>% 
+  dplyr::select(-id)
+cDNA_df_p53 <- merge(cDNA_df_p53, prediction)
+  
+
+# What are the individual weights?
+weight <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(weight) <- c("feature", "weight")
+weight <- weight %>% filter(feature != "(Intercept)")
+categorie <- c("affinity_pos", "n_sites", "highest_dist")
+weight$features <- gsub(paste(categorie, collapse="|"), "",weight$feature)
+weight$cond <- gsub(paste(weight$features, collapse = "|"), "", weight$feature)
+  
+
+# How many percent do the different tested features explain?
+exp_variance <- anova(x) %>% rownames_to_column("feature") %>%
+  setnames("Sum Sq", "sum_sq") %>%
+  dplyr::select(feature, sum_sq) %>%
+  mutate(sum = sum(sum_sq)) %>%
+  mutate(rel_sum_sq = (sum_sq/sum)*100) %>%
+  setnames("rel_sum_sq", "percent") %>%
+  dplyr::select("feature", "percent")
+
+exp_variance$group <- "no residual"
+exp_variance$group[grep("Residual", exp_variance$feature)] <- "residual"
+exp_variance$percent[exp_variance$feature == "Residuals"] <- 100 - exp_variance$percent[exp_variance$feature == "Residuals"]
+exp_variance$feature <- revalue(exp_variance$feature, c("Residuals"="total"))
+
+
+# Plotting
+ggplot(exp_variance, 
+       aes(x = percent, y = reorder(feature, -percent), fill = group)) +
+  scale_fill_manual(values = c("#1B998B", "#2D3047")) +
+  geom_bar(stat = "identity") + 
+  xlab("Variance explained (%)") + 
+  ylab("") + 
+  labs(title = "Linear variance modelling", 
+       subtitle = "Expression variance predicted by features") +
+  theme_pubr(border = T) +
+  theme(text = element_text(size = 12)) +
+  guides(fill = F)
+
+ggscatter(cDNA_df_p53, x = "reporter_activity", y = "reporter_activity_predicted",
+          add = "reg.line",
+          add.params = list(color = "#84A98C", fill = "lightgray"),
+          conf.int = TRUE, ylab = "Predicted reporter activity", size = 3,
+          xlab = "Average reporter activity") + 
+  theme_pubr(border = T)+
+  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 0, label.y = 3)
+
+ggplot(weight, 
+       aes(x = reorder(feature, -weight), y = weight)) +
+  geom_bar(stat = "identity", width = 0.7, fill = colors_continous[2], color = "black") + 
+  ylab("weight - reporter activity") +
+  xlab("") +
+  theme_pubr(border = T) +
+  guides(fill = F)
+```
+
+
+### Explain expression differences betweeen high affinity special reporters
+```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+## Rule of thumb for fitting models: e^n_features < n_observations
+
+## Subselect p53 only - let's only go for 2-2 combinations for now to simplify the model
+cDNA_df_p53 <- cDNA_df %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", pDNA_library == "lib_2", tf == "P53",
+         spacing == 7, str_detect(affinity_id, "[10-12]{2}_"), position == 0, background == 1, n_sites == 4,
+         promoter == "mCMV", str_detect(condition, "MCF7_WT_Nutlin"), str_detect(condition, "PFT", negate = T)) %>%
+  dplyr::select(reporter_id, condition, reporter_activity_condition,
+                affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4, motif_id, affinity_id) %>% 
+  mutate(reporter_activity = ave(reporter_activity_condition, motif_id, condition, FUN = function(x) mean(x)),
+         log_reporter_activity = log2(reporter_activity)) %>%
+  dplyr::select(-reporter_id, - reporter_activity_condition) %>%
+  unique()
+
+cDNA_df_p53$low_aff_site <- apply(cDNA_df_p53 %>% dplyr::select(affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4), 1, max)
+cDNA_df_p53$low_aff_site <- as.factor(cDNA_df_p53$low_aff_site)
+
+## Explain which affinities are essential at which position to boost activity
+cDNA_df_p53 <- cDNA_df_p53[order(cDNA_df_p53$condition),] %>%
+  dplyr::select(-motif_id)
+cDNA_df_p53$row <- rownames(cDNA_df_p53)
+
+## Fitting the model
+x <- lm(reporter_activity ~ low_aff_site + affinity_id, cDNA_df_p53)
+
+summ(x)
+par(mfrow=c(2,2))
+plot(x, main = i)
+
+# Get predicted activities per reporter
+y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(y) <- c("row", "reporter_activity_predicted")
+y$id <- 1:nrow(y)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53)), stringsAsFactors=FALSE)
+prediction <- merge(prediction,y, all = T) %>% 
+  dplyr::select(-id)
+cDNA_df_p53 <- merge(cDNA_df_p53, prediction)
+  
+
+# What are the individual weights?
+weight <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(weight) <- c("feature", "weight")
+weight <- weight %>% filter(feature != "(Intercept)")
+categorie <- c("affinity_pos", "n_sites", "highest_dist")
+weight$features <- gsub(paste(categorie, collapse="|"), "",weight$feature)
+weight$cond <- gsub(paste(weight$features, collapse = "|"), "", weight$feature)
+  
+
+# How many percent do the different tested features explain?
+exp_variance <- anova(x) %>% rownames_to_column("feature") %>%
+  setnames("Sum Sq", "sum_sq") %>%
+  dplyr::select(feature, sum_sq) %>%
+  mutate(sum = sum(sum_sq)) %>%
+  mutate(rel_sum_sq = (sum_sq/sum)*100) %>%
+  setnames("rel_sum_sq", "percent") %>%
+  dplyr::select("feature", "percent")
+
+exp_variance$group <- "no residual"
+exp_variance$group[grep("Residual", exp_variance$feature)] <- "residual"
+exp_variance$percent[exp_variance$feature == "Residuals"] <- 100 - exp_variance$percent[exp_variance$feature == "Residuals"]
+exp_variance$feature <- revalue(exp_variance$feature, c("Residuals"="total"))
+
+
+# Plotting
+ggplot(exp_variance, 
+       aes(x = percent, y = reorder(feature, -percent), fill = group)) +
+  scale_fill_manual(values = c("#1B998B", "#2D3047")) +
+  geom_bar(stat = "identity") + 
+  xlab("Variance explained (%)") + 
+  ylab("") + 
+  labs(title = "Linear variance modelling", 
+       subtitle = "Expression variance predicted by features") +
+  theme_pubr(border = T) +
+  theme(text = element_text(size = 12)) +
+  guides(fill = F)
+
+ggscatter(cDNA_df_p53, x = "reporter_activity", y = "reporter_activity_predicted",
+          add = "reg.line",
+          add.params = list(color = "#84A98C", fill = "lightgray"),
+          conf.int = TRUE, ylab = "Predicted reporter activity", size = 3,
+          xlab = "Average reporter activity") + 
+  theme_pubr(border = T)+
+  stat_cor(aes(label = ..r.label..), method = "pearson", label.x = 0, label.y = 3)
+
+ggplot(weight, 
+       aes(x = reorder(feature, -weight), y = weight)) +
+  geom_bar(stat = "identity", width = 0.7, fill = colors_continous[2], color = "black") + 
+  ylab("weight - reporter activity") +
+  xlab("") +
+  theme_pubr(border = T) +
+  guides(fill = F)
+```
+
+
+
+
+
+
+
+
+
 
 
 
@@ -1647,7 +2430,7 @@ autoplot(pca_res)
 ### Ridge/Lasso regression
 ```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Train model
-fit <- cva.glmnet(reporter_activity_condition ~ affinity_pos1 + affinity_pos2 + affinity_pos3 + affinity_pos4, data=cDNA_df_p53)
+fit <- cva.glmnet(reporter_activity_condition ~ affinity_pos1*affinity_pos2*affinity_pos3*affinity_pos4, data=cDNA_df_p53)
 
 # Get all parameters
 get_model_params <- function(fit) {
@@ -1663,7 +2446,7 @@ get_model_params <- function(fit) {
 x <- get_model_params(fit)
 
 # Perform GLM
-cDNA_dfMod <- glm(reporter_activity_condition ~ affinity_pos1 + affinity_pos2 + affinity_pos3 + affinity_pos4, data=cDNA_df_p53, family = "gaussian")
+cDNA_dfMod <- glm(reporter_activity_condition ~ affinity_pos1*affinity_pos2*affinity_pos3*affinity_pos4, data=cDNA_df_p53, family = "gaussian")
 print(cDNA_dfMod)
 
 ```
@@ -1679,8 +2462,8 @@ print(cDNA_dfMod)
 ```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Select features and activity to predict
 cDNA_df_p53 <- cDNA_df %>%
-  filter(neg_ctrls == "No", positive_ctrl == "No", outlier == "No", str_detect(affinity_id, "[1-5]_"),
-         promoter == "mCMV", str_detect(condition, "MCF7-WT_DMSO")) %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", str_detect(affinity_id, "[1,3,5,7,9]_"), pDNA_library == "lib_2",
+         promoter == "mCMV", str_detect(condition, "MCF7-WT_Nutlin")) %>%
   dplyr::select(reporter_id, condition, reporter_activity_condition, 
                 affinity_pos1,spacing, background) %>%
   mutate(spacing = as.factor(spacing),
@@ -1748,9 +2531,9 @@ ggplot(varimps %>% filter(variable != "_full_model_", variable != "_baseline_"),
 ```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Select features and activity to predict
 cDNA_df_p53 <- cDNA_df %>%
-  filter(neg_ctrls == "No", positive_ctrl == "No", outlier == "No", 
-         spacing == "7", background == "1", affinity_id == "0_mixed_any",
-         promoter == "mCMV", str_detect(condition, "MCF7-WT_DMSO")) %>%
+  filter(neg_ctrls == "No", positive_ctrl == "No", 
+         spacing == "7", background == "1", str_detect(affinity_id,"[7-9]"), pDNA_library == "lib_2",
+         promoter == "mCMV", str_detect(condition, "MCF7_WT_Nutlin")) %>%
   dplyr::select(reporter_id, condition, reporter_activity_condition, 
                 affinity_pos1, affinity_pos2, affinity_pos3, affinity_pos4) %>% 
   mutate(reporter_activity_condition = log2(reporter_activity_condition)) %>%

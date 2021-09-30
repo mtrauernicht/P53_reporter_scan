@@ -1363,13 +1363,74 @@ tf.df.long.export <- tf.df
 
 
 
+# Double check all generated reporters for any binding other than P53
+```{r}
+tf.df.check <- read.csv("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/tf_df_complete.csv", sep = ";") %>%
+  dplyr::select(-X)
+
+tf.df.check2 <- tf.df.check %>%
+  filter(tf == "Trp53") %>%
+  mutate(seq.text = paste(motif1, space1, motif2, space2, motif3, space3, motif4, distance.seq, sep = ""),
+         seq.name = gsub("(Gr|Trp53)_.*(_p_[0-9]{1,2}_.*)", "\\1\\2", seq.name),
+         seq.name = gsub("_bc_[0-9]{1}$", "", seq.name)) 
+  
+  
+tf.df.check <- tf.df.check2 %>%
+  dplyr::select(seq.name, seq.text) %>%
+  unique()
+
+dat2fasta(tf.df.check, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/tf_check_background.fasta")   
+```
 
 
+# run fimo
+```{r}
+# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# odir=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/tf_check
+# query=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/tf_check.fasta
+
+# nice -n 19 fimo --no-qvalue --thresh 1e-4 --verbosity 1 --o $odir $motfn $query 
+```
 
 
+```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
+# load motif Metadata --> PWM feature matrix
+tib_pwm_tf_check  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+                                        fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/tf_check/fimo.tsv',
+                                        db            = 2)
+
+tib_pwm_tf_check <- merge(tib_pwm_tf_check, tf.df.check2, by.x = "id", by.y = "seq.name", all = T) %>%
+  filter(oligo.barcode == 1, position == 0, promoter == "minP")
+
+tib_pwm_tf_check$affinity_id <- "0_mixed_any"
+tib_pwm_tf_check$affinity_id[tib_pwm_tf_check$affinity_pos1 == 0 & tib_pwm_tf_check$affinity_pos2 == 0 & tib_pwm_tf_check$affinity_pos3 == 4 & tib_pwm_tf_check$affinity_pos4 == 4] <- "6_high_start"
+tib_pwm_tf_check$affinity_id[tib_pwm_tf_check$affinity_pos1 == 4 & tib_pwm_tf_check$affinity_pos2 == 4 & tib_pwm_tf_check$affinity_pos3 == 0 & tib_pwm_tf_check$affinity_pos4 == 0] <- "7_high_end"
+tib_pwm_tf_check$affinity_id[tib_pwm_tf_check$affinity_pos1 == 3 & tib_pwm_tf_check$affinity_pos2 == 3 & tib_pwm_tf_check$affinity_pos3 == 3 & tib_pwm_tf_check$affinity_pos4 == 3] <- "2_very_low_only"
+tib_pwm_tf_check$affinity_id[tib_pwm_tf_check$affinity_pos1 == 0 & tib_pwm_tf_check$affinity_pos2 == 0 & tib_pwm_tf_check$affinity_pos3 == 0 & tib_pwm_tf_check$affinity_pos4 == 0] <- "5_high_only"
+tib_pwm_tf_check$affinity_id[tib_pwm_tf_check$affinity_pos1 == 1 & tib_pwm_tf_check$affinity_pos2 == 1 & tib_pwm_tf_check$affinity_pos3 == 1 & tib_pwm_tf_check$affinity_pos4 == 1] <- "4_med_only"
+tib_pwm_tf_check$affinity_id[tib_pwm_tf_check$affinity_pos1 == 2 & tib_pwm_tf_check$affinity_pos2 == 2 & tib_pwm_tf_check$affinity_pos3 == 2 & tib_pwm_tf_check$affinity_pos4 == 2] <- "3_low_only"
+tib_pwm_tf_check$affinity_id[tib_pwm_tf_check$affinity_pos1 == 4 & tib_pwm_tf_check$affinity_pos2 == 4 & tib_pwm_tf_check$affinity_pos3 == 4 & tib_pwm_tf_check$affinity_pos4 == 4] <- "1_null_only"
+
+tib_pwm_tf_check <- tib_pwm_tf_check %>%
+  filter(affinity_id != "0_mixed_any", affinity_id != "6_high_start", affinity_id != "7_high_end", affinity_id == "2_very_low_only")
+# Generate heatmaps in a loop for each TF
+# Select only hits
+tib_pwm_tf_check_2 <- tib_pwm_tf_check %>% 
+  remove_rownames %>% column_to_rownames(var="id")
+
+# Create breaks for heatmap (to make legend between heatmaps comparable)
+myBreaks1 <- seq(0,8,0.08)
 
 
+# Create heatmaps for each TF
+tib_pwm_tf_check_2 <- tib_pwm_tf_check_2[,colSums(tib_pwm_tf_check_2 != 0) > 0]
+tib_pwm_tf_check_2 <- tib_pwm_tf_check_2[,c(-27:-ncol(tib_pwm_tf_check_2))]
+tib_pwm_tf_check_2 <- as.matrix(tib_pwm_tf_check_2)
+pheatmap(tib_pwm_tf_check_2, 
+              border_color = "#000000",
+              breaks = myBreaks1)
 
+```
 
 
 
@@ -1425,6 +1486,125 @@ write.csv(tf.df.export, file = paste(filename,".csv", sep = ""), row.names = F)
 setwd("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/")
 dat2fasta(tf.df.export, outfile = paste(filename,".fasta", sep = ""))  
 
+```
+
+
+# Compare published backgrounds (Davis et al. 2019, biorxiv) with my new backgrounds
+```{r out.width= "100%", fig.align= "center", echo=FALSE}
+#bg41:
+bg41 <- "TGTTCAGAAGGGCCAGAAATGCCAAGGACTCAGGGGAGGAGAATTAAGTCAGAGAGTTTCATTACTGAGTGTTGTTTGACTTTGTTGTCACGGATTCATTTAACCATCTCTCTACCATGGTAAAAATGTGTATCCTATGTCCAGTATGAA"
+bg52 <- "CCAGGGAAAGCAGTCGGTGAGACCAGGCACAGTAGGATAGTTAGTTAGCTACCACATGTAAAGCTGAGAGCAGATGGTGCCGTTGATATAGAGCGCAGGAATGTGCGTGTTTATGCGGGTGCGTTTCTGTGCGTGTGCGTGTGGAAACCA"
+
+# Create whole df by merging all conditions
+tf.df_davis <- phylotools::read.fasta("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/mt20210208_oligo_pool_deep_RE_only.fasta")
+tf.df_davis <- tf.df_davis %>%
+  separate(col = seq.name, into = c("TF", "p", "position", "s", "spacing", 
+                                    "d", "distance", "b", "background",
+                                    "a1", "aff1", "a2", "aff2", "a3", "aff3",
+                                    "a4", "aff4"), sep = "_") %>%
+  dplyr::select(-p, -s, -d, -b, -a1, -a2, -a3, -a4, -distance) %>%
+  filter(TF == "Trp53", position == 0, spacing == 7) %>%
+  unique()
+
+tf.df_davis <- tf.df_davis %>%
+  mutate(motif1 = substr(seq.text, 0, 24),
+         space1 = substr(seq.text, 25, 31),
+         motif2 = substr(seq.text, 32, 55),
+         space2 = substr(seq.text, 56, 62),
+         motif3 = substr(seq.text, 63, 86),
+         space3 = substr(seq.text, 87, 93),
+         motif4 = substr(seq.text, 94, 117),
+         space4 = substr(seq.text, 118, 127))
+
+tf.df_davis_bg_1 <- tf.df_davis %>%
+  filter(background == "1") %>%
+  mutate(space1 = substr(bg41, 50, 57),
+         space2 = substr(bg41, 58, 64),
+         space3 = substr(bg41, 65, 71),
+         space4 = substr(bg41, 72, 78)) %>%
+  mutate(background = "bg41")
+
+tf.df_davis_bg_2 <- tf.df_davis %>%
+  filter(background == "2") %>%
+  mutate(space1 = substr(bg52, 50, 57),
+         space2 = substr(bg52, 58, 64),
+         space3 = substr(bg52, 65, 71),
+         space4 = substr(bg52, 72, 78)) %>%
+  mutate(background = "bg52")
+
+tf.df_davis <- rbind(tf.df_davis, tf.df_davis_bg_1, tf.df_davis_bg_2)
+
+tf.df_davis <- tf.df_davis %>%
+  mutate(seq.name = paste(background, aff1, aff2, aff3, aff4, sep = "_"),
+         seq.text = paste(motif1, space1, motif2, space2, motif3, space3, motif4, space4, sep = "")) %>%
+  dplyr::select(seq.name, seq.text) %>%
+  unique()
+
+dat2fasta(tf.df_davis, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check.fasta")  
+```
+
+## Run FIMO script again 
+```{bash run fimo db2_11, eval = FALSE}
+# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# odir=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check/
+# query=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check.fasta
+
+# nice -n 19 fimo --no-qvalue --thresh 1e-4 --verbosity 1 --o $odir $motfn $query 
+```
+
+
+```{r build tf motif matrices db2: tf_bg_davis, out.width= "100%", fig.align= "center", echo=FALSE}
+# load motif Metadata --> PWM feature matrix
+tib_pwm_tf_bg_davis  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+                                        fimo_fn       = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check/fimo.tsv',
+                                        db            = 2)
+```
+
+
+```{r, fig.height=4, fig.width=4, out.width= "100%", fig.align= "center", echo=FALSE, eval=FALSE}
+# Generate heatmaps in a loop for each TF
+# Select only hits
+tib_pwm_tf_bg_davis$bg <- gsub("[.*_].*","\\1",tib_pwm_tf_bg_davis$id)
+tib_pwm_tf_bg_davis_2 <- tib_pwm_tf_bg_davis %>% 
+  remove_rownames %>% column_to_rownames(var="id")
+
+for (i in unique(tib_pwm_tf_bg_davis_2$bg)) {
+  data <- tib_pwm_tf_bg_davis_2[tib_pwm_tf_bg_davis_2$bg == i,]
+  data <- data[,colSums(data != 0) > 0]
+p <- pheatmap(as.matrix(data %>% dplyr::select(-bg)), 
+              main = paste(i),
+              border_color = "#000000")
+print(p)
+}
+```
+
+
+
+## Compare specificity between my random backgrounds and 2 of the backgrounds used in Davis et al
+```{r, fig.height=10, fig.width=10, out.width= "100%", fig.align= "center", echo=FALSE}
+# Motif occurencies (binary): how many TFs are binding, TF-seq vs. my approach
+tib_pwm_all_bg_binary <- tib_pwm_tf_bg_davis_2 %>% mutate_if(is.numeric, function(x) ifelse((x==0 | is.na(x)),0,1)) 
+
+# Remove P53/63/73
+tib_pwm_all_bg_binary <- tib_pwm_all_bg_binary %>%
+  dplyr::select(-TP53, -TP63, -TP73)
+
+tib_pwm_all_bg_binary$MotifOccurencies <- rowSums(tib_pwm_all_bg_binary %>% dplyr::select(-bg))
+
+# Change colors
+tib_pwm_all_bg_binary$type <- "my_background"
+tib_pwm_all_bg_binary$type[grep("bg", tib_pwm_all_bg_binary$bg)] <- "davis_background"
+colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51")
+
+
+# Generate plot
+tib_pwm_all_bg_binary%>%
+  dplyr::select(bg,MotifOccurencies, type)%>%
+  ggplot(aes(bg, MotifOccurencies, fill=type))+
+  geom_boxplot() + 
+  scale_fill_manual(values = colors_diverse)+
+  theme_pubr(border = T) +
+  coord_flip()
 ```
 
 # Session Info
