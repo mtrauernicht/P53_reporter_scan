@@ -44,7 +44,7 @@ with pysam.FastxFile(snakemake.input["fq"]) as fq_in:
         barcode = seq[0:end_bc]
 
         # if barcode intact and no N in barcode, write to file
-        if((len(barcode) == 12) and ('N' not in barcode)):
+        if((len(barcode) >= 12) and ('N' not in barcode)):
             # write to output file
             tsv_out.write(barcode + '\n')
 
