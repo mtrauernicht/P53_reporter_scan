@@ -6,6 +6,8 @@
 .DS_Store
 ._.DS_Store
 .snakemake/
+.deep_scan_trp53_gr.Rproj
+._deep_scan_trp53_gr.Rproj
 analyses/.DS_Store
 analyses/._.DS_Store
 
