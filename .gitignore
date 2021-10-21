@@ -1,4 +1,13 @@
+# Hidden files
 .Rproj.user
 .Rhistory
 .RData
 .Ruserdata
+.DS_Store
+._.DS_Store
+.snakemake/
+analyses/.DS_Store
+analyses/._.DS_Store
+
+# Folder with all the data
+data/
