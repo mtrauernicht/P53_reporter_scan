@@ -494,7 +494,7 @@ motif_space_export <- motif_space_export %>% dplyr::select("seq.name", "seq.text
  
 ## Run FIMO script again 
 ```{bash run fimo spacings, eval = FALSE}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/spacing_new
 # query="/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/fimo/spacing_new.fasta"
 
@@ -507,7 +507,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_10bp_space_new  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_10bp_space_new  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/spacing_new/fimo.tsv',
                                         db            = 2)
 ```
@@ -618,7 +618,7 @@ spacers_export <- spacers_export %>% dplyr::select(seq.name, seq.text) %>% uniqu
 
 ## Run FIMO script again 
 ```{bash run fimo spacings, eval = FALSE}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/spacing_new_trunc_2
 # query="/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/fimo/spacing_new_trunc.fasta"
 
@@ -631,7 +631,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_10bp_space_new_trunc  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_10bp_space_new_trunc  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/spacing_new_trunc_2/fimo.tsv',
                                         db            = 2)
 ```
@@ -754,7 +754,7 @@ motif_space_export <- motif_space_export %>% dplyr::select("seq.name", "seq.text
  
 ## Run FIMO script again 
 ```{bash run fimo spacings, eval = FALSE}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/distance_new
 # query="/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/fimo/distance_new.fasta"
 
@@ -767,7 +767,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_10bp_dist_new  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_10bp_dist_new  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/distance_new/fimo.tsv',
                                         db            = 2)
 ```
@@ -893,7 +893,7 @@ position_space_export <- position_space_export %>% dplyr::select(seq.name, seq.t
 
 ## Run FIMO script again 
 ```{bash run fimo spacings, eval = FALSE}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/position
 # query="/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/fimo/position.fasta"
 
@@ -906,7 +906,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_position  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_position  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/position/fimo.tsv',
                                         db            = 2)
 ```
@@ -1123,7 +1123,7 @@ position_space_export <- position_space_export %>% dplyr::select(seq.name, seq.t
 
 ## Run FIMO script again 
 ```{bash run fimo spacings, eval = FALSE}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/position_connell
 # query="/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/fimo/position_connell.fasta"
 
@@ -1136,7 +1136,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_position_connell  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_position_connell  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/position_connell/fimo.tsv',
                                         db            = 2)
 ```
@@ -1239,7 +1239,7 @@ tf.df.export <- subset(tf.df, select = c(seq.name, seq.text))
 
 ## Run FIMO script again 
 ```{bash run fimo db2_9, eval = FALSE}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/output/reporter_check_2
 # query=/home/m.trauernicht/mydata/projects/tf_activity_reporter/data/trp53_model/fimo/reporter_check.fasta
 
@@ -1252,7 +1252,7 @@ We built a TF motif matrix using -log10 transformed FIMO scores. We used this fe
 
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_tf_check  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_tf_check  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/reporter_check/fimo.tsv',
                                         db            = 2)
 ```
@@ -1385,7 +1385,7 @@ dat2fasta(tf.df.check, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_sca
 
 # run fimo
 ```{r}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/tf_check
 # query=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/tf_check.fasta
 
@@ -1395,7 +1395,7 @@ dat2fasta(tf.df.check, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_sca
 
 ```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_tf_check  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_tf_check  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/home/m.trauernicht/mydata/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/tf_check/fimo.tsv',
                                         db            = 2)
 
@@ -1545,7 +1545,7 @@ dat2fasta(tf.df_davis, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_sca
 
 ## Run FIMO script again 
 ```{bash run fimo db2_11, eval = FALSE}
-# motfn=/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/20170320_pwms_selected.meme
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
 # odir=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check/
 # query=/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check.fasta
 
@@ -1555,7 +1555,7 @@ dat2fasta(tf.df_davis, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_sca
 
 ```{r build tf motif matrices db2: tf_bg_davis, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
-tib_pwm_tf_bg_davis  <- get_pwm_feature_matrix(motif_meta_fn = '/home/f.comoglio/mydata/Annotations/TFDB/Curated_Natoli/update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+tib_pwm_tf_bg_davis  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
                                         fimo_fn       = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check/fimo.tsv',
                                         db            = 2)
 ```
