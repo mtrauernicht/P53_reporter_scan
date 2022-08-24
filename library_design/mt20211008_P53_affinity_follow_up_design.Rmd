@@ -55,6 +55,7 @@ StartTime <-Sys.time()
 Date <- substr(gsub("-","",Sys.time()),1,8) 
 # libraries:
 library(blogdown)
+library(dplyr)
 ```
 
 ### Custom functions
@@ -74,7 +75,7 @@ SetFileName <- function(filename, initials) {
 
 ```{r}
 ## Load in the previously designed sequences 
-tf.df <- read_csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/tf_df_complete.csv") %>%
+tf.df <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/output/tf_df_complete.csv") %>%
   filter(tf == "Trp53", position == 0, promoter == "mCMV", background == 1, oligo.barcode == 1, spacing == 1 | spacing == 7, 
          affinity_pos1 == 0, affinity_pos2 == 0, affinity_pos3 == 0, affinity_pos4 == 0) %>%
   dplyr::select(tf, promoter, spacing, primer1_seq, motif3, space3, motif4, distance.seq, 
@@ -91,7 +92,7 @@ tf.df <- merge(tf.df, ddG)
   
 
 ## Fill in the correct motif sequences
-p53_affinities <- read_csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/p53_fimo_sequences_affinity.csv")
+p53_affinities <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/p53_fimo_sequences_affinity.csv")
 zero <- data.frame("ddG" = 0, "Motif" = "")
 p53_affinities <- rbind(p53_affinities, zero)
 
@@ -107,7 +108,7 @@ tf.df$motifs[tf.df$motif3 == ""] <- 1
 tf.df$motifs[tf.df$motif4 == ""] <- 1
 
 ## Add barcodes (select from previous script the ones that were used for similar active reporters)
-barcode <- read_csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/tf_df_complete.csv") %>%
+barcode <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/output/tf_df_complete.csv") %>%
   filter(tf == "Trp53", position == 0, promoter == "mCMV", background == 1, spacing == 1 | spacing == 7) %>%
   dplyr::select(barcode) %>%
   unique()
@@ -128,7 +129,7 @@ tf.df <- tf.df[!tf.df$seq.name %in% tf.df3$seq.name,]
 ## Export
 tf.df.export <- tf.df %>%
   dplyr::select(seq.name, seq.text)
-write.csv(tf.df.export, "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/mt20211008_follow_up_library_p53_affinity.csv")
+#write.csv(tf.df.export, "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/mt20211008_follow_up_library_p53_affinity.csv")
 ```
 
 ---
