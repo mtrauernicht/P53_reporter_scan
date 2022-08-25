@@ -197,7 +197,7 @@ get_pwm_feature_matrix <- function(motif_meta_fn, fimo_fn, db = 2) {
 ## Data import
 ```{r}
 # Import chosen TFs
-motifs <- read.csv2("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/parameter_files/TF_motifs.csv", header = T)
+motifs <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/parameter_files/TF_motifs.csv", header = T)
 ```
 
 

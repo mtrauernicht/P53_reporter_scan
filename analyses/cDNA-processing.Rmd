@@ -301,7 +301,7 @@ reds <- c("#DD6B48", "#E38569", "#E7A08A", "#EDBBAB", "#EFC9BC")
 
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 # Import processed bc counts from the preprocessing step
-cDNA_df <- read.csv("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/gcf6502/results/mt20220727_reporter_activity_filt.csv", header = T) 
+cDNA_df <- read.csv("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/gcf6502/results/mt20220824_reporter_activity_filt.csv", header = T) 
 cDNA_df <- cDNA_df[!is.na(cDNA_df$tf),]
 cDNA_df$activity[is.na(cDNA_df$activity)] <- 0
 
@@ -433,7 +433,10 @@ Aim: I want to characterize the reporter activity distributions in the tested co
 cDNA_df_cor_mcf <- cDNA_df %>%
   filter(tf == "P53", motif_id != "4_4_4_4", promoter != "random", str_detect(reporter_id, "random", negate = T)) %>%
   filter(str_detect(condition, "MCF7_WT")) %>%
-  dplyr::select(reporter_id, reporter_activity_sample, condition, reporter_activity_condition) %>%
+  #filter(str_detect(sample_id, "MCF7_r1_gcf6412", negate = T)) %>%
+  #filter(str_detect(sample_id, "gcf6881", negate = T)) %>%
+  dplyr::select(reporter_id, reporter_activity_sample, condition, reporter_activity_condition, motif_id) %>%
+  #mutate(reporter_activity_sample = log2(reporter_activity_sample)) %>%
   unique()
 
 for (i in unique(cDNA_df_cor_mcf$reporter_id)) {
@@ -448,16 +451,19 @@ for (i in unique(cDNA_df_cor_mcf$reporter_id)) {
 }
 
 cDNA_df_cor_mcf <- cDNA_df_cor_mcf %>%
+  #mutate(pval_adj = p.adjust(pval, method = "fdr")) %>%
   dplyr::select(-reporter_activity_sample) %>%
   unique() %>%
   spread(condition, reporter_activity_condition) %>%
   mutate(log2dif = log2(MCF7_WT_Nutlin / MCF7_WT_DMSO),
          log10pval = -log10(pval))
 
-ggplot_cust(cDNA_df_cor_mcf,
+ggplot_cust(cDNA_df_cor_mcf %>%
+              filter(motif_id %in% c("0_0_0_0", "1_1_1_1", "2_2_2_2", "3_3_3_3")),
             aes(x = log2dif, y = log10pval)) +
   geom_point() +
-  geom_hline(yintercept = -log10(0.05))
+  geom_hline(yintercept = -log10(0.05), lty = 4) +
+  facet_wrap(~motif_id)
 
 
 cDNA_df_cor_mcf$sensitive <- "No"
@@ -516,6 +522,24 @@ ggplot() +
   scale_color_gradient(low = "#E6EEE8", high = colors_continous[2]) +
   geom_point(data = x %>% filter(neg_ctrls == "Yes"), aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin), color = "black") +
   geom_abline(linetype = "dashed")
+
+ggplot(x %>% 
+         filter(motif_id %in% c("0_0_0_0", "1_1_1_1", "2_2_2_2", "3_3_3_3")) %>% 
+         filter(neg_ctrls == "No", positive_ctrl == "No"), 
+       aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin, color = dif)) +
+  geom_point() +
+  scale_color_gradient(low = "#E6EEE8", high = colors_continous[2]) +
+  geom_abline(linetype = "dashed") +
+  facet_wrap(~motif_id)
+
+ggplot(x %>% 
+         filter(motif_id %in% c("0_0_0_0", "1_1_1_1", "2_2_2_2", "3_3_3_3")) %>% 
+         filter(neg_ctrls == "No", positive_ctrl == "No"), 
+       aes(x = MCF7_KO, y = MCF7_WT_Nutlin, color = dif)) +
+  geom_point() +
+  scale_color_gradient(low = "#E6EEE8", high = colors_continous[2]) +
+  geom_abline(linetype = "dashed") +
+  facet_wrap(~motif_id)
 
 ## Correlate replicates
 cDNA_df_cor_mcf2 <- cDNA_df %>%

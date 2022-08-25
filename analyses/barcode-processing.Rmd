@@ -799,8 +799,8 @@ ggpairs(pDNA_lib1 %>%
 
 
 pDNA <- pDNA_lib1 %>%
-  mutate(pDNA_counts_rpm = 
-           (pMT06_r1 + pMT06_r2) / 2) %>%
+  rowwise() %>%
+  mutate(pDNA_counts_rpm = mean(c(pMT06_r1, pMT06_r2), na.rm = T)) %>%
   distinct(barcode, pDNA_counts_rpm)
 
 
@@ -929,7 +929,7 @@ for (i in unique(bc_df_rep$condition)){
 # First identify and remove outlier barcodes - this removes the noise created by faulty barcode clustering etc. 
 ## Calculate mean and SD for each reporter
 bc_df_2 <- bc_df%>%
-  filter(pDNA_counts_rpm > 5)
+  filter(pDNA_counts_rpm > 3)
 
 bc_df_cDNA <- bc_df_2[-grep("pMT06", bc_df_2$sample),]
 bc_df_cDNA$reporter_id <- gsub(".{5}$", "", bc_df_cDNA$reporter_id)
@@ -951,7 +951,7 @@ bc_df_cDNA$reporter_activity_sd <- ave(bc_df_cDNA$activity, bc_df_cDNA$reporter_
 ## Remove reporters with a higher SD than the mean activity
 bc_df_cDNA_filt <- bc_df_cDNA %>%
   mutate(outlier = "No")
-bc_df_cDNA_filt$outlier[bc_df_cDNA_filt$reporter_activity_sd >= (bc_df_cDNA_filt$reporter_activity)] <- "Yes"
+bc_df_cDNA_filt$outlier[bc_df_cDNA_filt$reporter_activity > 3 & bc_df_cDNA_filt$reporter_activity_sd >= (bc_df_cDNA_filt$reporter_activity)] <- "Yes"
 
 ## Plot the fraction of outliers per sample
 n_outlier <- bc_df_cDNA_filt %>%
@@ -979,7 +979,7 @@ plot_ly(bc_df_cDNA_filt %>%
   
 # ## Only keep conditions with low noise levels
 bc_df_cDNA_filt <- bc_df_cDNA_filt %>%
-  filter(n_outlier < 100)
+  filter(n_outlier < 20)
 
 ## Recalculate mean and sd
 bc_df_cDNA_filt$reporter_activity <- ave(bc_df_cDNA_filt$activity, bc_df_cDNA_filt$reporter_id, 
