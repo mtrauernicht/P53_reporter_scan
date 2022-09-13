@@ -498,10 +498,10 @@ Define the arguments:
 ref.file <- "/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/TIDE/E1709_20220711/mt20220711_seq.txt"
 output.file <- "/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/TIDE/E1709_20220711/mt20220711_TIDE.pdf"
 folder <- "/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/TIDE/E1709_20220711/"
-reporter_names <- c("low", "high", "pos_ctrl")
+reporter_names <- c("sp1", "+1", "random", "+3", "low_conc", "+5", "high_conc", "+7", "pos_ctrl", "+9")
 seqstart = 2
 seqend = 300
-array_length = 2
+array_length = 9
 ```
 
 
