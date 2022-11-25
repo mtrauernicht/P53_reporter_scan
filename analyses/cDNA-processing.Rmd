@@ -297,6 +297,7 @@ colors_diverse_2 <- c("#CB997E", "#DDBEA9", "#FFE8D6", "#B7B7A4", "#A5A58D", "#6
 colors_continous <- c("MCF7_KO" = "#DFE4DC", "MCF7_WT_DMSO" = "#CAD2C5", "MCF7_WT_Nutlin" = "#84A98C", "#52796F", "#354F52", "#2F3E46")
 colors_continous_2 <- c("#F8F9FA", "#E9ECEF", "#DEE2E6", "#CED4DA", "#ADB5BD", "#6C757D", "#495057", "#343A40", "#212529")
 reds <- c("#DD6B48", "#E38569", "#E7A08A", "#EDBBAB", "#EFC9BC")
+colors_promoter <- c("#F6D289", "#ECD9B1", "#FBEDD0")
 ```
 
 ---
@@ -457,6 +458,17 @@ cDNA_df <- cDNA_df %>%
 # Compute means per sample
 cDNA_df$reporter_activity_condition <- ave(cDNA_df$reporter_activity_norm, cDNA_df$condition, cDNA_df$reporter_id, FUN = function(x) mean(x))
 cDNA_df$reporter_activity_sample <- ave(cDNA_df$reporter_activity_norm, cDNA_df$sample_id, cDNA_df$reporter_id, FUN = function(x) mean(x))
+
+# # Enrichment over KO condition
+# ko_df <- cDNA_df %>%
+#   filter(condition == "MCF7_KO") %>%
+#   dplyr::select(reporter_id, "reporter_activity_condition_ko" = reporter_activity_condition) %>%
+#   distinct()
+# 
+# 
+# 
+# cDNA_df <- merge(cDNA_df, ko_df, all = T, by = "reporter_id") %>%
+#   mutate(reporter_activity_condition = reporter_activity_condition/reporter_activity_condition_ko)
 ```
 
 ---
@@ -726,7 +738,15 @@ cDNA_df_p53$n_adjacent <- 0
 cDNA_df_p53$n_adjacent[grep("3_3", cDNA_df_p53$motif_id)] <- 1
 cDNA_df_p53$n_adjacent[grep("3_3_3", cDNA_df_p53$motif_id)] <- 2
 
+cDNA_df_p53$motif_dist <- 1
+cDNA_df_p53$motif_dist[grep("3_4_4$", cDNA_df_p53$motif_id)] <- 2
+cDNA_df_p53$motif_dist[grep("3_4$", cDNA_df_p53$motif_id)] <- 3
+cDNA_df_p53$motif_dist[grep("3$", cDNA_df_p53$motif_id)] <- 4
+
 cDNA_df_p53$n_sites <- as.character(cDNA_df_p53$n_sites)
+
+cDNA_df_p53$n_sites_spacer <- paste(cDNA_df_p53$n_sites, cDNA_df_p53$highest_dist, sep = "_")
+cDNA_df_p53$n_sites_spacer <- factor(cDNA_df_p53$n_sites_spacer, levels = c("1_0","2_0","3_0","4_0","2_1", "3_1"))
 
 # Rename 0,1,2,3,4 in null, very-weak, weak, medium, strong
 replace <- data.frame("old" = c(0:4), "new" = c("_4_strong", "_3_medium", "_2_weak", "_1_very-weak", "_0_null"), stringsAsFactors=FALSE)
@@ -743,7 +763,7 @@ cDNA_df_p53 <- cDNA_df_p53[order(cDNA_df_p53$condition),] %>%
 cDNA_df_p53$row <- rownames(cDNA_df_p53)
 
 ## Fitting the model
-x <- lm(reporter_activity ~ n_sites + highest_dist + affinity_pos4, cDNA_df_p53)
+x <- lm(reporter_activity ~ n_sites_spacer + motif_dist, cDNA_df_p53)
 
 summ(x)
 par(mfrow=c(2,2))
@@ -988,7 +1008,7 @@ compare_df <- cDNA_df %>%
   dplyr::select(reporter_id, reporter_activity_condition, condition, neg_ctrls, tf, promoter, positive_ctrl, motif_id, SumAffinity, spacing) %>%
   unique() %>%
   pivot_wider(names_from = condition, values_from = reporter_activity_condition) %>%
-  mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO) %>%
+  mutate(dif = MCF7_WT_Nutlin / MCF7_KO_DMSO) %>%
   na.omit()
 
 ggplot(compare_df %>%
@@ -1055,7 +1075,7 @@ ggplot(compare_df2,
 ## Subselect reporters
 cDNA_df_p53 <- cDNA_df %>%
   filter(neg_ctrls == "No", positive_ctrl == "No",tf == "P53",
-         position == 0, promoter != "random",
+         position == 0, promoter == "mCMV", 
          affinity_id %in% c(
            #"1_high_only", 
                             #"3_med_only", 
@@ -1069,12 +1089,12 @@ cDNA_df_p53 <- cDNA_df %>%
   dplyr::select(-reporter_activity_condition) %>%
   unique() %>%
   spread(key = "condition", value = "reporter_activity") %>%
-  mutate(dif = log2(MCF7_WT_Nutlin / MCF7_WT_DMSO)) %>%
-  mutate(MCF7_WT_Nutlin = log2(MCF7_WT_Nutlin)) %>%
+  mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO) %>%
+  mutate(MCF7_WT_Nutlin = MCF7_WT_Nutlin) %>%
   mutate(n_sites = as.character(n_sites))%>%
   mutate(affinity_pos1 = ifelse(affinity_id == "8_very-low_null", "3", affinity_pos1)) %>%
   distinct() %>%
-  mutate(spacing = factor(spacing, levels = c("7", "0", "1", "2", "3", "4", "5", "6", "8", "9", "10")))
+  mutate(spacing = factor(spacing, levels = c("7", "0", "1", "2", "3", "4", "5", "6", "8", "9", "10"))) 
 
 cDNA_df_p53$motif_dist <- 1
 cDNA_df_p53$motif_dist[grep("3_4_4$", cDNA_df_p53$motif_id)] <- 2
@@ -1084,6 +1104,10 @@ cDNA_df_p53$motif_dist[grep("3$", cDNA_df_p53$motif_id)] <- 4
 cDNA_df_p53$highest_dist <- "0"
 cDNA_df_p53$highest_dist[grep("3_4_3", cDNA_df_p53$motif_id)] <- "1"
 cDNA_df_p53$highest_dist[grep("3_4_4_3", cDNA_df_p53$motif_id)] <- "1"
+
+cDNA_df_p53 <- cDNA_df_p53 %>%
+  mutate(n_sites_spacing_dist = paste(n_sites, spacing, highest_dist, sep = "_")) %>%
+  mutate(n_sites_spacing_dist = factor(n_sites_spacing_dist, levels = c("1_7_0", "2_7_0", "2_7_1", "3_7_0", "3_7_1", "4_0_0",  "4_1_0",  "4_2_0",  "4_3_0", "4_4_0", "4_5_0", "4_6_0",   "4_7_0", "4_8_0", "4_9_0", "4_10_0")))
 
 cDNA_df_p53$n_adjacent <- 0
 cDNA_df_p53$n_adjacent[grep("3_3", cDNA_df_p53$motif_id)] <- 1
@@ -1100,7 +1124,7 @@ cDNA_df_p53_dmso <- cDNA_df_p53
 cDNA_df_p53_dmso$row <- rownames(cDNA_df_p53_dmso)
 
 ## Fitting the model
-x <- lm(dif ~ n_sites + spacing + highest_dist + motif_dist, cDNA_df_p53_dmso)
+x <- lm(dif ~ n_sites_spacing_dist, cDNA_df_p53_dmso)
 
 summ(x)
 par(mfrow=c(2,2))
@@ -1120,10 +1144,7 @@ cDNA_df_p53_dmso$condition <- "DMSO"
 # What are the individual weights?
 weight <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column() %>% na.omit()
 names(weight) <- c("feature", "weight")
-references <- data.frame("feature" = c("spacing7", "n_sites1"), 
-                         "weight" = c(0,0))
-weight <- rbind(weight, references)
-weight <- weight %>% filter(feature != "(Intercept)")
+weight$feature[weight$feature == "(Intercept)"] <- "n_sites_spacing_dist1_7_0"
 categorie <- c("affinity_pos1", "spacing")
 weight$features <- gsub(paste(categorie, collapse="|"), "",weight$feature)
 weight$cond <- gsub(paste(weight$features, collapse = "|"), "", weight$feature)
@@ -1137,7 +1158,7 @@ cDNA_df_p53_nutlin <- cDNA_df_p53
 cDNA_df_p53_nutlin$row <- rownames(cDNA_df_p53_nutlin)
 
 ## Fitting the model
-x <- lm(MCF7_WT_Nutlin ~ n_sites + spacing + highest_dist + motif_dist, cDNA_df_p53_nutlin)
+x <- lm(MCF7_WT_Nutlin ~ n_sites_spacing_dist, cDNA_df_p53_nutlin)
 
 summ(x)
 par(mfrow=c(2,2))
@@ -1158,10 +1179,7 @@ cDNA_df_p53 <- rbind(cDNA_df_p53_nutlin, cDNA_df_p53_dmso)
 # What are the individual weights?
 weight_nutlin <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column() %>% na.omit()
 names(weight_nutlin) <- c("feature", "weight")
-references <- data.frame("feature" = c("spacing7", "n_sites1"), 
-                         "weight" = c(0,0))
-weight_nutlin <- rbind(weight_nutlin, references)
-weight_nutlin <- weight_nutlin %>% filter(feature != "(Intercept)")
+weight_nutlin$feature[weight_nutlin$feature == "(Intercept)"] <- "n_sites_spacing_dist1_7_0"
 categorie <- c("affinity_pos1", "spacing")
 weight_nutlin$features <- gsub(paste(categorie, collapse="|"), "",weight_nutlin$feature)
 weight_nutlin$cond <- gsub(paste(weight_nutlin$features, collapse = "|"), "", weight_nutlin$feature)
@@ -1176,7 +1194,9 @@ ggplot(cDNA_df_p53 %>% filter(condition == "Nutlin"),
   geom_smooth(color = "black", method = "lm") +
   geom_point(size = 2) +
   scale_color_manual(values = rev(reds)) +
-  theme(legend.position = "none")
+  theme(legend.position = "none") +
+  ylim(0,90)+
+  xlim(0,90)
 
 ggplot(cDNA_df_p53 %>% filter(condition == "DMSO"),
        aes(x = dif, y = reporter_activity_predicted, color = n_sites)) +
@@ -1185,24 +1205,25 @@ ggplot(cDNA_df_p53 %>% filter(condition == "DMSO"),
   scale_color_manual(values = rev(reds)) +
   theme(legend.position = "none")
 
-level_order <- c("spacing0", "spacing1", "spacing2", "spacing3", "spacing4", "spacing5", "spacing6", "spacing7", "spacing8", "spacing9", "spacing10",
-                 "n_sites1", "n_sites2", "n_sites3", "n_sites4", "highest_dist1", "motif_dist")
+level_order <- c("n_sites_spacing_dist1_7_0","n_sites_spacing_dist2_7_0","n_sites_spacing_dist2_7_1", "n_sites_spacing_dist3_7_0", "n_sites_spacing_dist3_7_1", "n_sites_spacing_dist4_0_0", "n_sites_spacing_dist4_1_0", 
+                 "n_sites_spacing_dist4_2_0","n_sites_spacing_dist4_3_0", "n_sites_spacing_dist4_4_0","n_sites_spacing_dist4_5_0", "n_sites_spacing_dist4_6_0", "n_sites_spacing_dist4_7_0", "n_sites_spacing_dist4_8_0",
+                 "n_sites_spacing_dist4_9_0", "n_sites_spacing_dist4_10_0","motif_dist")
 
 ggplot(weight %>% filter(condition == "Nutlin"), 
-       aes(x = factor(feature, level = level_order), y = weight, fill = cond)) +
+       aes(x = factor(feature, level = level_order), y = weight)) +
   geom_bar(stat = "identity", position = "dodge", width = 0.9, color = "white") + 
   ylab("weight - reporter activity") +
   xlab("") +
-  scale_fill_manual(values = colors_continous_2[c(1,3,5,6)]) +
+  #scale_fill_manual(values = colors_continous_2[c(1,3,5,6)]) +
   guides(fill = F)+
   theme_classic_lines_90()
 
 ggplot(weight %>% filter(condition == "DMSO"), 
-       aes(x = factor(feature, level = level_order), y = weight, fill = cond)) +
+       aes(x = factor(feature, level = level_order), y = weight)) +
   geom_bar(stat = "identity", position = "dodge", width = 0.9, color = "white") + 
   ylab("weight - reporter activity") +
   xlab("") +
-  scale_fill_manual(values = colors_continous_2[c(1,3,5,6)]) +
+  #scale_fill_manual(values = colors_continous_2[c(1,3,5,6)]) +
   guides(fill = F)+
   theme_classic_lines_90()
   
