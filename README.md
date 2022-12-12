@@ -8,7 +8,7 @@ It is unclear how P53 binding site architecture relates to TF activity. To test 
 >**TF reporter library design:**
 
 The designed first library contains:
-- >6,000 TF reporters, each with up to 4 identical TF binding sites, followed by a minP or minCMV and a barcode in the transcription unit
+- 6,000 TF reporters, each with up to 4 identical TF binding sites, followed by a minP or minCMV and a barcode in the transcription unit
 - 5 different P53 motifs with different predicted (SELEX-seq) binding affinities
 - Large range of combinatorial binding affinity
 - Spacer length between binding sites varied from 4-14 bp in 1 bp steps
