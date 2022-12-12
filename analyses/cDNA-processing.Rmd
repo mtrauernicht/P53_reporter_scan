@@ -895,19 +895,71 @@ Aim: What are the best reporters? Can we explain their design using a linear mod
 
 
 ```{r out.width= "100%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
-## 5C-D: Linear model to fit most active reporters
+
+
+## Figure 5A: Show that some reporters are superior to commercial reporters
+compare_df <- cDNA_df %>%
+  filter(neg_ctrls == "No",tf == "P53",
+         position %in% c(0, 60, 70), promoter != "random",
+         !affinity_id %in% c("9_null_only")) %>%
+  dplyr::select(reporter_id, reporter_activity_condition, condition, neg_ctrls, tf, promoter, positive_ctrl, motif_id, SumAffinity, spacing) %>%
+  unique() %>%
+  pivot_wider(names_from = condition, values_from = reporter_activity_condition) %>%
+  mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO) %>%
+  na.omit()
+
+library(scales)
+ggplot(compare_df %>%
+         filter(neg_ctrls == "No", str_detect(motif_id,"2", negate = T)),
+       aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin)) +
+  geom_abline(lty = 2) +
+  geom_point(shape = 21, aes(fill = dif, color = positive_ctrl), size = 2) +
+  scale_color_manual(values = c("black", "red"))  +
+  geom_label(data = compare_df %>% 
+               filter(neg_ctrls == "No", str_detect(motif_id,"2", negate = T)) %>%
+               filter(dif > 70 | MCF7_WT_Nutlin > 85), 
+             aes(label = motif_id), 
+             nudge_y = +6,
+             color = "black") +
+  ylab("Reporter activity (P53-WT + Nutlin-3a)") +
+  xlab("Reporter activity (P53-WT)") +
+  scale_fill_gradient2(low = "#DBE6DD", high = colors_continous[3],  limits = c(0,5), oob = squish)
+
+
+
+## Figure 5C: Line-plot comparing sensitivities of my reporters to positive controls
+top_reporters <- compare_df %>%
+         filter(neg_ctrls == "No", str_detect(motif_id,"2", negate = T)) %>%
+  distinct(MCF7_WT_Nutlin, reporter_id) %>%
+  arrange(desc(MCF7_WT_Nutlin)) %>%
+  top_n(6)
+
+compare_df2 <- cDNA_df %>%
+  filter(tf == "P53", motif_id != "4_4_4_4", promoter != "random") %>%
+  filter(reporter_id %in% top_reporters$reporter_id | positive_ctrl == "Yes") %>%
+  dplyr::select(reporter_id, reporter_activity_condition, condition, neg_ctrls, tf, promoter, positive_ctrl, motif_id, SumAffinity, spacing) %>%
+  unique() 
+
+ggplot(compare_df2,
+       aes(x = condition, y = reporter_activity_condition, color = positive_ctrl, group = reporter_id)) +
+  geom_point() +
+  geom_line() +
+  ylab("Reporter activity")+
+  scale_color_manual(values = c("Yes" = "red", "No" = "grey60"))
+
+
+## 5F-G: Linear model to fit most active reporters
 
 ## Subselect reporters
 cDNA_df_p53 <- cDNA_df %>%
   filter(neg_ctrls == "No", positive_ctrl == "No",tf == "P53",
          position == 0, promoter != "random",
-         affinity_id %in% c(
-           #"1_high_only", 
-                            #"3_med_only", 
+         affinity_id %in% c( "1_high_only", 
+                            "3_med_only", 
                             #"5_low_only", 
                             "7_very-low_only")) %>%
   dplyr::select(condition, reporter_activity_condition, promoter, background, 
-                affinity_pos1, spacing, n_sites, motif_id, affinity_id) %>%
+                affinity_pos1, spacing, n_sites, motif_id, affinity_id, reporter_id) %>%
   mutate(background = as.factor(background),
          reporter_activity = ave(reporter_activity_condition, motif_id, condition, n_sites, spacing, promoter, background, FUN = function(x) mean(x))) %>%
   dplyr::select(-reporter_activity_condition) %>%
@@ -957,7 +1009,7 @@ cDNA_df_p53 <- cDNA_df_p53 %>%
 cDNA_df_p53$promoter_background <- relevel(cDNA_df_p53$promoter_background, ref = "minP_1")
 
 ## Fitting the model
-x <- lm(MCF7_WT_Nutlin ~ spacing_degree_transf + promoter_background + close, cDNA_df_p53)
+x <- lm(log2(MCF7_WT_Nutlin) ~ spacing_degree_transf  + promoter_background + affinity_id, cDNA_df_p53)
 
 summ(x)
 par(mfrow=c(2,2))
@@ -967,7 +1019,7 @@ plot(x)
 y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
 names(y) <- c("row", "reporter_activity_predicted")
 y$id <- 1:nrow(y)
-prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53_dmso)), stringsAsFactors=FALSE)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53)), stringsAsFactors=FALSE)
 prediction <- merge(prediction,y, all = T) %>% 
   dplyr::select(-id)
 cDNA_df_p53 <- merge(cDNA_df_p53, prediction)
@@ -976,87 +1028,37 @@ cDNA_df_p53 <- merge(cDNA_df_p53, prediction)
 # What are the individual weights?
 weight <- data.frame(x$coefficients, stringsAsFactors=FALSE) %>% rownames_to_column() %>% na.omit()
 names(weight) <- c("feature", "weight")
-categorie <- c("promoter_background", "close", "spacing")
+weight_intercepts <- data.frame("feature" = c("1_high_only", "promoter_backgroundminP_1"), "weight" = c(0, 0))
+weight <- rbind(weight, weight_intercepts)
+categorie <- c("promoter_background", "affinity_id")
 weight$features <- gsub(paste(categorie, collapse="|"), "",weight$feature)
 weight$cond <- gsub(paste(weight$features, collapse = "|"), "", weight$feature)
 weight <- weight %>% filter(feature != "(Intercept)")
 
 
 ## Figure 5C: Correlation between predicted and measured activity
-ggplot(cDNA_df_p53,
-       aes(x = MCF7_WT_Nutlin, y = reporter_activity_predicted)) +
+ggplot(cDNA_df_p53 %>%
+         mutate(top_6 = ifelse(reporter_id %in% top_reporters$reporter_id, "top", "notop")),
+       aes(x = log2(MCF7_WT_Nutlin), y = reporter_activity_predicted, color = top_6)) +
+  geom_abline(lty = 2) +
   geom_smooth(color = "black", method = "lm") +
   geom_point(size = 2) +
+  scale_color_manual(values = c("notop" = "black", "top" = "red")) +
   xlab("Measured reporter activity") +
   ylab("Predicted reporter activity") +
-  theme(legend.position = "none") +
-  ylim(0,90)+
-  xlim(0,90)
+  theme(legend.position = "none")
 
-level_order <- c("_degree_transf","yes","minP_1", "minP_2", "minP_3", "mCMV_1", "mCMV_2", "mCMV_3")
+level_order <- rev(c("spacing_degree_transf", "1_high_only", "3_med_only", "7_very-low_only", "minP_1", "minP_2", "minP_3", "mCMV_1", "mCMV_2", "mCMV_3"))
 
 ## Figure 5D: Weights of the fitted model
 ggplot(weight, 
-       aes(x = factor(features, level = level_order), y = weight)) +
-  geom_bar(stat = "identity", position = "dodge", width = 0.9, color = "white") + 
+       aes(y = factor(features, level = level_order), x = weight)) +
+  geom_bar(stat = "identity", position = "dodge", width = 0.75, color = "black") + 
   ylab("weight - reporter activity") +
   xlab("") +
   #scale_fill_manual(values = colors_continous_2[c(1,3,5,6)]) +
   guides(fill = F)+
   theme_classic_lines_90()
-
-
-
-## Figure 5E: Show that some reporters are superior to commercial reporters
-compare_df <- cDNA_df %>%
-  filter(neg_ctrls == "No",tf == "P53",
-         position %in% c(0, 60, 70), promoter != "random",
-         !affinity_id %in% c("9_null_only")) %>%
-  dplyr::select(reporter_id, reporter_activity_condition, condition, neg_ctrls, tf, promoter, positive_ctrl, motif_id, SumAffinity, spacing) %>%
-  unique() %>%
-  pivot_wider(names_from = condition, values_from = reporter_activity_condition) %>%
-  mutate(dif = MCF7_WT_Nutlin / MCF7_WT_DMSO) %>%
-  na.omit()
-
-library(scales)
-ggplot(compare_df %>%
-         filter(neg_ctrls == "No", str_detect(motif_id,"2", negate = T)),
-       aes(x = MCF7_WT_DMSO, y = MCF7_WT_Nutlin)) +
-  geom_abline(lty = 2) +
-  geom_point(shape = 21, aes(fill = dif, color = positive_ctrl), size = 2) +
-  scale_color_manual(values = c("black", "red"))  +
-  geom_label(data = compare_df %>% 
-               filter(neg_ctrls == "No", str_detect(motif_id,"2", negate = T)) %>%
-               filter(dif > 70 | MCF7_WT_Nutlin > 85), 
-             aes(label = motif_id), 
-             nudge_y = +6,
-             color = "black") +
-  ylab("Reporter activity (P53-WT + Nutlin-3a)") +
-  xlab("Reporter activity (P53-WT)") +
-  scale_fill_gradient2(low = "#DBE6DD", high = colors_continous[3],  limits = c(0,5), oob = squish)
-
-
-
-## Figure 5F: Line-plot comparing sensitivities of my reporters to positive controls
-top_reporters <- compare_df %>%
-         filter(neg_ctrls == "No", str_detect(motif_id,"2", negate = T)) %>%
-  distinct(MCF7_WT_Nutlin, reporter_id) %>%
-  arrange(desc(MCF7_WT_Nutlin)) %>%
-  top_n(6)
-
-compare_df2 <- cDNA_df %>%
-  filter(tf == "P53", motif_id != "4_4_4_4", promoter != "random") %>%
-  filter(reporter_id %in% top_reporters$reporter_id | positive_ctrl == "Yes") %>%
-  dplyr::select(reporter_id, reporter_activity_condition, condition, neg_ctrls, tf, promoter, positive_ctrl, motif_id, SumAffinity, spacing) %>%
-  unique() 
-
-## Figure 4B: activity per spacing at different affinities - only low_affinity, background 3
-ggplot(compare_df2,
-       aes(x = condition, y = reporter_activity_condition, color = positive_ctrl, group = reporter_id)) +
-  geom_point() +
-  geom_line() +
-  ylab("Reporter activity")+
-  scale_color_manual(values = c("Yes" = "red", "No" = "grey60"))
 
 ```
 
