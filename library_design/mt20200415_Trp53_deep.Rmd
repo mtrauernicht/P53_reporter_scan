@@ -1496,7 +1496,7 @@ bg41 <- "TGTTCAGAAGGGCCAGAAATGCCAAGGACTCAGGGGAGGAGAATTAAGTCAGAGAGTTTCATTACTGAGTG
 bg52 <- "CCAGGGAAAGCAGTCGGTGAGACCAGGCACAGTAGGATAGTTAGTTAGCTACCACATGTAAAGCTGAGAGCAGATGGTGCCGTTGATATAGAGCGCAGGAATGTGCGTGTTTATGCGGGTGCGTTTCTGTGCGTGTGCGTGTGGAAACCA"
 
 # Create whole df by merging all conditions
-tf.df_davis <- phylotools::read.fasta("/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/mt20210208_oligo_pool_deep_RE_only.fasta")
+tf.df_davis <- phylotools::read.fasta("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/output/mt20210208_oligo_pool_deep_RE_only.fasta")
 tf.df_davis <- tf.df_davis %>%
   separate(col = seq.name, into = c("TF", "p", "position", "s", "spacing", 
                                     "d", "distance", "b", "background",
@@ -1540,7 +1540,7 @@ tf.df_davis <- tf.df_davis %>%
   dplyr::select(seq.name, seq.text) %>%
   unique()
 
-dat2fasta(tf.df_davis, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check.fasta")  
+#dat2fasta(tf.df_davis, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check.fasta")  
 ```
 
 ## Run FIMO script again 
@@ -1556,7 +1556,7 @@ dat2fasta(tf.df_davis, outfile = "/DATA/usr/m.trauernicht/projects/SuRE_deep_sca
 ```{r build tf motif matrices db2: tf_bg_davis, out.width= "100%", fig.align= "center", echo=FALSE}
 # load motif Metadata --> PWM feature matrix
 tib_pwm_tf_bg_davis  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
-                                        fimo_fn       = '/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/fimo/background_check/fimo.tsv',
+                                        fimo_fn       = '/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/fimo/background_check/fimo.tsv',
                                         db            = 2)
 ```
 
