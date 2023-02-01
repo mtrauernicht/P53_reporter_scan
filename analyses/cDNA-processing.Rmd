@@ -663,7 +663,7 @@ ggplot(cDNA_df %>%
        aes(x = spacing, y = reporter_activity_spacing, color = condition, fill = condition)) +
   geom_point() +
   geom_smooth()+
-  theme_pubr(border = T) +
+  #theme_pubr(border = T) +
   ggtitle("reporter activity per spacing")+
   xlab("spacing length between motifs (bp)")+
   ylab("reporter activity (a.u.)")+
@@ -743,11 +743,12 @@ ggplot(cDNA_df %>%
          dplyr::select(tf, reporter_activity_condition, reporter_id, spacing, condition, affinity_id, promoter, background) %>% 
          unique() %>%
          mutate(reporter_activity_spacing = ave(reporter_activity_condition, affinity_id, promoter, background, condition, spacing, FUN = function(x) mean(x))) %>%
+         mutate(promoter = factor(promoter, levels = c("minP", "mCMV"))) %>%
          unique(), 
        aes(x = spacing, y = reporter_activity_spacing, color = condition, fill = condition)) +
   geom_point() +
   geom_smooth()+
-  theme_pubr(border = T) +
+  #theme_pubr(border = T) +
   ggtitle("reporter activity per spacing")+
   xlab("spacing length between motifs (bp)")+
   ylab("reporter activity (a.u.)")+
@@ -798,7 +799,8 @@ data <- cDNA_df %>%
 ggplot(data, aes(x = promoter, y = reporter_activity_condition)) +
   geom_quasirandom_rast(stroke = 0, alpha = 1, size = 1, raster.dpi = 600) + 
   geom_boxplot(aes(fill = promoter), alpha = .8) +
-  scale_fill_manual(values = c("#F6D289", "#ECD9B1", "#FBEDD0"))
+  scale_fill_manual(values = c("#F6D289", "#ECD9B1", "#FBEDD0"))+
+  stat_compare_means(method = "t.test") 
 
 ## Figure 4B: impact of background sequence
 ggplot(cDNA_df %>% 
@@ -961,7 +963,9 @@ cDNA_df_p53 <- cDNA_df %>%
 
 ## Mutate spacing to helical turn
 cDNA_df_p53 <- cDNA_df_p53 %>%
-  mutate(spacing_degree = 2* pi * ((spacing - 1) / 10.5)) %>%
+  mutate(spacing = spacing - 1) %>%
+  mutate(spacing_rotation = (spacing) / 10.5) %>%
+  mutate(spacing_degree = 2* pi * spacing_rotation) %>%
   mutate(spacing_degree = ifelse(is.infinite(spacing_degree), 0, spacing_degree)) %>%
   mutate(spacing_degree_transf = cos(spacing_degree)) %>%
   mutate(close = ifelse(spacing == 0, "yes", "no")) ## Punish reporters that are directly next to each other
