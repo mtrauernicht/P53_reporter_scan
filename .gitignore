@@ -9,7 +9,6 @@
 .deep_scan_trp53_gr.Rproj
 ._deep_scan_trp53_gr.Rproj
 .html
-analyses/*.html
 analyses/misc
 
 # Folder with all the data
