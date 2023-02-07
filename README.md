@@ -31,3 +31,12 @@ All TF reporters were designed using FIMO. This way, the spacings were designed 
 - take average across the 5 barcodes
 - then take average across the 3 biological replicates
 - calculate enrichment per condition tested over background reporter activity (core promoter-only reporters)
+
+___
+
+**Repository guide:**
+
+- analysis folder: pre-processing of the barcode counts (barcode-preprocessing.Rmd) + analysis of barcode counts, linear modeling, figure generation (cDNA-processing.Rmd)
+- library_design folder: contains script that was used to generate the TP53 reporter sequences
+- pDNA_insert_seq folder: contains scripts to analyze the full-length sequences of the plasmid pool that was used for transfections
+- raw_data_analysis folder: contains the scripts that were used to extract and cluster the raw barcode counts
