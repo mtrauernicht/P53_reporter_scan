@@ -1,5 +1,5 @@
 ---
-title: "Barcode processing - P53 Deep Scan"
+title: "Barcode processing - TP53 Reporter Scan"
 author: 
   - name: "Max Trauernicht"
     email: "m.trauernicht@nki.nl"
@@ -21,7 +21,7 @@ output:
 ---
 
 ### Aim
-pMT06 was transfected into various cell types and mRNA barcode counts were sequenced together with pMT06 pDNA counts. In four different sequencing runs, data for all P53 & GR reporters was collected, and will be analyzed here. 
+pMT06 (the pDNA library) was transfected into MCF7 cells that are either TP53 proficient or TP53-KO - 24 hours later mRNA was isolated and barcodes were quantified by sequencing together with pMT06 pDNA counts. This was done in three independent replicates.
 
 ---
 
@@ -144,10 +144,8 @@ corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...
 
 ```{r data import, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
 # Load metadata file that contains all required information about the sequenced samples
-metadata_df <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/mt20220530_metadata_all_experiments.csv") %>%
-  na.omit() %>%
-  filter(library == "new") %>%
-  filter(condition %in% c("MCF7", "MCF7_Nutlin", "MCF7_KO", "MCF7_KO_Nutlin", "pMT06", "K562", "K562_Dex"))
+metadata_df <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/mt20230202_metadata.csv") %>%
+  dplyr::select("path" = count_path, "file" = count_file, "gcf" = gcf_number, replicate:library)
 
 # Load in barcode counts
 bc_files <- paste(metadata_df$path, metadata_df$file, sep = "")
@@ -197,116 +195,6 @@ for (i in unique(bc_df$sample_id)) {
 ```
 
 
-## Investigate variance of the read counts between individual samples
-
-```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
-# Make dataframe to compare raw counts between conditions
-bc_df_filt <- bc_df %>%
-  filter(tf == "Trp53")
-bc_df_filt <- bc_df_filt[!is.na(bc_df_filt$condition),]
-bc_df_cor <- bc_df_filt %>%
-  dplyr::select(rpm, barcode, sample_id)
-
-bc_df_cor <- bc_df_cor %>%
-  mutate(rpm = as.integer(rpm)) %>%
-  spread(sample_id, rpm) 
-
-bc_df_cor[is.na(bc_df_cor)] <- 0
-
-# Convert into data.frame with row.names for deseq2
-bc_df_cor2 <- bc_df_cor %>%
-  column_to_rownames("barcode")
-
-
-
-#######################################
-## Initialize deseq2
-
-# Prepare metadata ready for deseq
-metadata <- bc_df_filt %>%
-  distinct(condition, replicate, gcf, sample_id)
-
-
-# Initialize
-bc_df_cor3 <- bc_df_cor2[,-grep("pDNA", names(bc_df_cor2))]
-bc_df_cor2$mean <- rowMeans(bc_df_cor2)
-bc_df_cor2 <- bc_df_cor2 %>%
-  filter(mean > 200) %>%
-  dplyr::select(-mean)
-
-
-rnaseq_dds <- DESeqDataSetFromMatrix(countData = bc_df_cor2,
-                                     colData = metadata,
-                                     design= ~ condition)
-
-# Execute deseq2
-rnaseq_dds <- DESeq(rnaseq_dds)
-
-
-#######################################
-## PCA analysis - quality control
-
-# Get the "normalized" values and create PCA plot
-# Note that "normalized" is simply log2 + 0.01 transformed normalized counts!
-rnaseq_dds_norm <- normTransform(rnaseq_dds, pc = 0.01)
-plt <- plotPCA(rnaseq_dds_norm, intgroup = c("gcf"), ntop = 50)
-
-plt + 
-  theme_bw() +
-  theme(aspect.ratio = 1) +
-  scale_shape_manual()
-
-## PCA plot alternative
-rnaseq_dds_norm <- assay(vst(rnaseq_dds))
-p <- pca(bc_df_cor2, metadata = metadata %>%
-           column_to_rownames("sample_id"), removeVar = 0.1)
-biplot(p, 
-       colby = "condition", 
-       legendPosition = "right",
-       legendLabSize = 8,
-       legendTitleSize = 8,
-       legendIconSize = 3, 
-       lab = "")
-
-
-## Correlation heatmap
-bc_df_cor2$mean <- rowMeans(bc_df_cor2)
-bc_df_cor2 <- bc_df_cor2 %>%
-  filter(mean > 200) %>%
-  dplyr::select(-mean)
-
-cor_df <- cor(bc_df_cor2, method = "pearson")
-
-pheatmap(cor_df, border_color = "black")
-
-
-# Get cluster information
-clusters <- hclust(dist(cor_df))
-cutree(clusters, h = 7) 
-plot(clusters)
-abline(h = 3, col = "red")
-
-# Apply cutree() to hclust.pokemon: cut.pokemon
-cut.pokemon<-cutree(clusters,k=3)
-##############################################################
-# Initialize total within sum of squares error: wss
-wss <- 0
-# Look over 1 to 15 possible clusters
-for (i in 1:13) {
-  # Fit the model: km.pokemon
-  km.pokemon <- kmeans(cor_df, centers = i, nstart = 20, iter.max = 50)
-  # Save the within cluster sum of squares
-  wss[i] <- km.pokemon$tot.withinss
-}
-# Produce a scree plot
-plot(1:13, wss, type = "b", 
-     xlab = "Number of Clusters", 
-     ylab = "Within groups sum of squares")
-
-```
-It looks like the the most variance is between the sequencing runs itself. But this makes sense because I used two different pDNA libraries for the 4 sequencing runs. Some samples correlate with pDNA counts - these samples have pDNA contamination and need to be removed.
-
-
 ---
 
 ## Read distribution
@@ -319,24 +207,10 @@ bc_df_reads <- bc_df_reads %>%
   dplyr::group_by(sample, gcf) %>% 
   mutate(seq_sum = sum(starcode_counts))
 
-plot_ly(bc_df_reads[bc_df_reads$gcf == "gcf6412",] %>% dplyr::select(sample, seq_sum) %>% unique(), x = ~sample, y = ~seq_sum, type = 'bar',
+plot_ly(bc_df_reads %>% dplyr::select(sample_id, seq_sum) %>% unique(), x = ~sample_id, y = ~seq_sum, type = 'bar',
              marker = list(color = '#D6D5C9',
                            line = list(color = 'rgb(8,48,107)', width = 1.5))) %>% 
   layout(title = "Percentage of reads in sequencing run 1",
-         yaxis = list(title = "Percentage of matched reads"),
-         xaxis = list(title = "sample"))
-
-plot_ly(bc_df_reads[bc_df_reads$gcf == "gcf6502",] %>% dplyr::select(sample, seq_sum) %>% unique(), x = ~sample, y = ~seq_sum, type = 'bar',
-             marker = list(color = '#D6D5C9',
-                           line = list(color = 'rgb(8,48,107)', width = 1.5))) %>% 
-  layout(title = "Percentage of reads in sequencing run 2",
-         yaxis = list(title = "Percentage of matched reads"),
-         xaxis = list(title = "sample"))
-
-plot_ly(bc_df_reads[bc_df_reads$gcf == "gcf6881",] %>% dplyr::select(sample, seq_sum) %>% unique(), x = ~sample, y = ~seq_sum, type = 'bar',
-             marker = list(color = '#D6D5C9',
-                           line = list(color = 'rgb(8,48,107)', width = 1.5))) %>% 
-  layout(title = "Percentage of reads in sequencing run 3",
          yaxis = list(title = "Percentage of matched reads"),
          xaxis = list(title = "sample"))
 
@@ -409,6 +283,8 @@ plot_ly(n_highly_expressed, x = ~sample_id, y = ~as.numeric(n_bc), type = 'bar',
          xaxis = list(title = "sample"))
 
 ```
+## The read distribution plots show that the pDNA samples are uniformly distributed. They also show that the MCF7-TP53-WT cells have highly active TP53 reporters, while random reporters got a lot of reads in the MCF7-TP53-KO cells.
+
 
 ---
 
@@ -427,7 +303,7 @@ bc_df_filt <- bc_df[!is.na(bc_df$tf),]
 for (i in unique(bc_fraction$cutoff)) {
   for (j in unique(bc_df_filt$sample_id)) {
     bc_fraction$bcs_found[bc_fraction$cutoff == i & bc_fraction$sample_id == j] <- nrow(bc_df_filt[bc_df_filt$rpm >= i & bc_df_filt$sample_id == j & bc_df_filt$tf == "Trp53",])/
-      nrow(bc_annotation[bc_annotation$tf == "Trp53",]) *100
+      length(unique(bc_annotation$reporter_id[bc_annotation$tf == "Trp53"])) *100
   }
 }
 
@@ -454,10 +330,10 @@ bc_fraction$gcf <- gsub(".*(gcf.*)", "\\1", bc_fraction$sample_id)
 # Plot to evaluate data quality per cutoff
 for (i in unique(bc_fraction$gcf)) {
   p <- ggplot(bc_fraction[bc_fraction$gcf == i,]) +
-  geom_point(aes(x = cutoff, y = bcs_found), color = '#1B998B', size = 1) +
-  geom_line(aes(x = cutoff, y = bcs_found), color = '#1B998B', size = 1) +
-  geom_point(aes(x = cutoff, y = bc_reads), color = 'black', size = 1) +
-  geom_line(aes(x = cutoff, y = bc_reads), color = 'black', size = 1) +
+  geom_point(aes(x = cutoff, y = bcs_found), color = '#1B998B') +
+  geom_line(aes(x = cutoff, y = bcs_found), color = '#1B998B') +
+  geom_point(aes(x = cutoff, y = bc_reads), color = 'black') +
+  geom_line(aes(x = cutoff, y = bc_reads), color = 'black') +
   theme_bw()+
   xlab("rpm cutoff")+
   ylab("total barcodes (green) and matched barcode reads (black) detected (%)")+
@@ -466,6 +342,7 @@ for (i in unique(bc_fraction$gcf)) {
   print(p)
 }
 ```
+## Conclusion: All reads are matched to barcodes that come from the reporter library. Very good. All barcodes can be found back. At a cutoff of ~5 rpm, already ~10% of the barcodes are lost. I guess this is to be expected.
 
 ---
 
@@ -473,21 +350,9 @@ for (i in unique(bc_fraction$gcf)) {
 
 ```{r pDNA_cDNA_correlation, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
 ## 3: What is the correlation of the 24 cDNA bc counts with the pDNA bc counts? 
-pDNA <- data.frame("pDNA_lib2" = bc_df$rpm[bc_df$sample_id == "pMT06_r1_gcf6412"],
-                   "barcode"= bc_df$barcode[bc_df$sample_id == "pMT06_r1_gcf6412"], stringsAsFactors=FALSE)
-bc_df_2 <- merge(pDNA, bc_df, all = T)
-
 pDNA <- data.frame("pDNA_lib3" = bc_df$rpm[bc_df$sample_id == "pMT06_r2_gcf6502"],
                    "barcode"= bc_df$barcode[bc_df$sample_id == "pMT06_r2_gcf6502"], stringsAsFactors=FALSE)
 bc_df_2 <- merge(pDNA, bc_df_2, all = T)
-
-ggplot(bc_df_2 %>%
-         filter(str_detect(sample_id, "gcf6412")), aes(x = pDNA_lib2, y = rpm)) +
-  geom_bin2d(bins = 100)+
-  xlim(0,1000) +
-  ylim(0,1000)+
-  theme_bw()+
-  facet_wrap(~sample)
 
 ggplot(bc_df_2 %>%
          filter(str_detect(sample_id, "gcf6502")), aes(x = pDNA_lib3, y = rpm)) +
@@ -505,21 +370,13 @@ ggplot(bc_df_2 %>%
   theme_bw()+
   facet_wrap(~sample)
 
-ggplot(bc_df_2 %>%
-         filter(str_detect(sample_id, "gcf6992")), aes(x = pDNA_lib3, y = rpm)) +
-  geom_bin2d(bins = 100)+
-  xlim(0,1000) +
-  ylim(0,5000)+
-  theme_bw()+
-  facet_wrap(~sample)
-
 # How do the highly represented pDNA_barcodes deviate from the barcode reads in the cDNA data? 
 ## I do this because the correlation of lowly representdied barcodes is very noisy
-pDNA_bias <- data.frame("sample_id" = unique(bc_df_2$sample_id[grep("gcf6412|gcf6502|gcf6881|gcf6992", bc_df_2$sample_id)]),
+pDNA_bias <- data.frame("sample_id" = unique(bc_df_2$sample_id[grep("gcf6502|gcf6881", bc_df_2$sample_id)]),
                         "cor" = "", stringsAsFactors = F)
 for (i in unique(pDNA_bias$sample_id)) {
-  pDNA_bias$cor[pDNA_bias$sample_id == i] <- cor(bc_df_2$rpm[bc_df_2$pDNA_lib2 >= 250 & bc_df_2$sample_id == i], 
-                                                 bc_df_2$pDNA_lib2[bc_df_2$pDNA_lib2 >= 250 & bc_df_2$sample_id == i], 
+  pDNA_bias$cor[pDNA_bias$sample_id == i] <- cor(bc_df_2$rpm[bc_df_2$pDNA_lib3 >= 250 & bc_df_2$sample_id == i], 
+                                                 bc_df_2$pDNA_lib3[bc_df_2$pDNA_lib3 >= 250 & bc_df_2$sample_id == i], 
                                                  use = "pairwise.complete.obs")
 }
 
@@ -534,18 +391,10 @@ pDNA_bias <- pDNA_bias %>%
   filter(as.numeric(cor) <= 0.25 | str_detect(sample_id, "pMT06")) 
 
 bc_df <- bc_df %>%
-  filter(sample_id %in% c(pDNA_bias$sample, "pMT06_r1_gcf6412"))
-
-# Old vs new pDNA data
-ggplot(bc_df_2 %>% dplyr::select(barcode, pDNA_lib3, pDNA_lib2) %>% unique(), aes(x = pDNA_lib3, y = pDNA_lib2)) +
-    geom_pointdensity(show.legend = F, adjust = 100)+
-    theme_bw()+
-    theme(text = element_text(size=14)) +
-    xlab("new pDNA data rep2")+
-    ylab("new pDNA data rep1")+
-    ggtitle("rep1 vs. rep2 new pDNA data")+
-    scale_color_viridis()
+  filter(sample_id %in% c(pDNA_bias$sample))
 ```
+## Conclusion: None of the samples correlate with the pDNA input, which means that we are actually measuring the abundance of transcribed barcodes in the cDNA.
+
 
 ---
 
@@ -585,19 +434,7 @@ for (i in unique(bc_df_rep$condition)){
   print(plt)
 }
 ```
-
-**Stuff learned from above figures:**  
-Some samples can be excluded from further analysis because they don't contain useful information, these samples are:  
-MCF7-KO-DMSO: rep2_seq1, rep1_seq1(?), r2_seq2(?), r1_seq3, r3_seq3  
-MCF7-KO-Nutlin: rep2_seq1, rep3_seq1(?), r1_seq2, r1_seq3, r3_seq3  
-MCF7-WT-DMSO: rep2_seq1, rep3_seq1  
-MCF7-WT-Nutlin: rep3_seq1, r2_seq2, r1_seq3  
-A549_DMSO: r2_seq3, r3_seq3  
-A549_Dex10: r2_seq3  
-A549_Dex100: r2_seq3  
-A549-Dex-1: r1_seq2, r2_seq3  
-mES-N2B27-HQ: rep1_seq1  
-mES-N2B27-RA: rep1_seq1, rep2_seq1  
+## The read counts highly correlate!
 
 ---
 
@@ -719,61 +556,6 @@ bc_df$n_sites[bc_df$affinity_pos3 == 4] <- bc_df$n_sites[bc_df$affinity_pos3 == 
 bc_df$n_sites[bc_df$affinity_pos4 == 4] <- bc_df$n_sites[bc_df$affinity_pos4 == 4] - 1
 ```
 
-
----
-
-
-### Scaling the data
-```{r}
-# # It might be hard to compare the KO with the WT barcode counts because in th KO we don't really have active elements -> 'inactive' elements will take up most of the reads
-# ## How can we scale the different conditions correctly?
-# ggplot(bc_df %>% 
-#          filter(neg_ctrls == "Yes", str_detect(tf, "53"), str_detect(sample, "MCF")) %>% 
-#          dplyr::select(tf, sample, rpm, reporter_id, gcf) %>% 
-#          unique(), 
-#        aes(x = sample, y = rpm, color = tf)) + 
-#   geom_quasirandom(dodge.width = 0.75) + 
-#   scale_color_brewer(palette = "Dark2") + 
-#   theme_bw() + 
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-#   facet_wrap(~gcf)
-# 
-# 
-# bc_df_scale <- bc_df %>%
-#   filter(neg_ctrls == "Yes", str_detect(tf, "53")) %>% 
-#   dplyr::select(sample, rpm, reporter_id, gcf) %>%
-#   unique() %>% 
-#   group_by(sample) %>%
-#   mutate(rpm = mean(rpm)) %>%
-#   ungroup() %>%
-#   dplyr::select(-reporter_id) %>%
-#   unique() %>%
-#   dplyr::select("background_rpm" = rpm, sample) %>%
-#   unique() %>%
-#   filter(str_detect(sample, "pDNA", negate = T))
-# 
-# bc_df <- merge(bc_df, bc_df_scale, all = T)
-# 
-# bc_df <- bc_df %>%
-#   mutate(rpm_norm = rpm / background_rpm)
-# 
-# ggplot(bc_df %>% 
-#          filter(neg_ctrls == "Yes", str_detect(tf, "53"), str_detect(sample, "MCF")) %>% 
-#          dplyr::select(tf, sample, rpm_norm, reporter_id, gcf) %>% 
-#          unique(), 
-#        aes(x = sample, y = rpm_norm, color = tf)) + 
-#   geom_quasirandom(dodge.width = 0.75) + 
-#   scale_color_brewer(palette = "Dark2") + 
-#   theme_bw() + 
-#   theme(axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0.5)) +
-#   facet_wrap(~gcf)
-# # looks quite ok, MCF7_WT_DMSO_r1_gcf6412 has some outliers - maybe I need to remove this sample
-```
-
-
-
-
-
 ---
 
 ### Normalization of barcode counts:
@@ -786,46 +568,17 @@ bc_df <- bc_df[!is.na(bc_df$tf),]
 
 ## Add pDNA data as separate column
 
-
 ### First correlate all pDNA data to ensure that all samples have a good quality
-pDNA_lib1 <- bc_df[grep("pMT06_r1", bc_df$sample),] %>% 
-  dplyr::select(barcode,"pDNA_counts_rpm_gcf6412" = rpm, gcf)
-
-pDNA_lib2 <- bc_df[grep("pMT06_r2", bc_df$sample),] %>% 
+pDNA_lib2 <- bc_df[grep("pMT06", bc_df$sample),] %>% 
   dplyr::distinct(barcode, rpm) %>%
   setnames("rpm", "pDNA_counts_rpm")
 
-# ggpairs(pDNA_lib1 %>%
-#                    dplyr::select(-barcode),
-#                upper = list(continuous = corColor),
-#                lower = list(continuous = function(data, mapping, ...) {
-#                    ggally_points(data = data[n, ], mapping = mapping, alpha = 0.1, size = 0.5) +
-#                    geom_abline(slope = 1, lty = "dashed", col = "red") +
-#                    theme_bw()}),
-#                diag = list(continuous = function(data, mapping, ...) {
-#                    ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
-#                    theme_bw()})) +
-#   ggtitle("Correlation Between Replicates, Condition") +
-#   theme(text = element_text(size = 10)) +
-#   xlab("rpm") +
-#   ylab("rpm")
-
-
-# pDNA <- pDNA_lib1 %>%
-#   rowwise() %>%
-#   mutate(pDNA_counts_rpm = mean(c(pMT06_r1, pMT06_r2), na.rm = T)) %>%
-#   distinct(barcode, pDNA_counts_rpm)
-
-
-bc_df <- merge(pDNA_lib1, bc_df, by = c("barcode", "reporter_id", "gcf"), all = T)
 bc_df <- merge(pDNA_lib2, bc_df, by = c("reporter_id", "barcode"), all = T)
 
 ## Compute activity by dividing cDNA bc counts through pDNA bc counts (since I have two totally different pDNA libraries, I need to do it for the two libraries separately)
 bc_df$activity <- 0
 
 bc_df$activity <- bc_df$rpm  / bc_df$pDNA_counts_rpm
-bc_df$activity[bc_df$gcf == "gcf6412"] <- bc_df$rpm[bc_df$gcf == "gcf6412"]  / bc_df$pDNA_counts_rpm_gcf6412[bc_df$gcf == "gcf6412"] 
-
 ```
 
 ---
@@ -939,22 +692,21 @@ for (i in unique(bc_df_rep$condition)){
 
 ---
 
-## Removing outliers
+## Filtering data
 
 ```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
-# First identify and remove outlier barcodes - this removes the noise created by faulty barcode clustering etc. 
-## Calculate mean and SD for each reporter
+## Only keep data based on pDNA counts > 3
 bc_df_2 <- bc_df %>%
-  filter((pDNA_counts_rpm_gcf6412 > 3 & gcf == "gcf6412") | (pDNA_counts_rpm > 3 & gcf != "gcf6412") )
+  filter(pDNA_counts_rpm > 3)
 
-
+## Remove pDNA samples (as I am not interested in their activities)
 bc_df_cDNA <- bc_df_2[-grep("pMT06", bc_df_2$sample),]
-bc_df_cDNA$reporter_id <- gsub(".{5}$", "", bc_df_cDNA$reporter_id)
 
+## Calculate reporter activities
+bc_df_cDNA$reporter_id <- gsub(".{5}$", "", bc_df_cDNA$reporter_id)
 bc_df_cDNA$reporter_activity <- ave(bc_df_cDNA$activity, bc_df_cDNA$reporter_id, 
                                 bc_df_cDNA$sample_id, FUN =
                                   function(x) quantile(x, 0.5))
-
 
 ## Remove data points that are 3xSD away from 50% quantile
 bc_df_cDNA$deviation <- bc_df_cDNA$activity / bc_df_cDNA$reporter_activity
@@ -963,43 +715,6 @@ bc_df_cDNA$deviation <- bc_df_cDNA$activity / bc_df_cDNA$reporter_activity
 bc_df_cDNA$n_reporters <- ave(bc_df_cDNA$reporter_id, bc_df_cDNA$reporter_id, 
                                 bc_df_cDNA$sample_id, FUN =
                                   function(x) as.numeric(length(x)))
-
-# ## Remove data points that are 2xSD away from the mean
-# bc_df_cDNA$upper_activity <- bc_df_cDNA$reporter_activity + (1.75 * bc_df_cDNA$reporter_activity_sd)
-# bc_df_cDNA$lower_activity <- bc_df_cDNA$reporter_activity - (1.75 * bc_df_cDNA$reporter_activity_sd)
-# bc_df_cDNA_filt <- bc_df_cDNA %>%
-#   mutate(outlier = "No")
-# bc_df_cDNA_filt$outlier[bc_df_cDNA_filt$activity >= bc_df_cDNA_filt$upper_activity | 
-#                                 bc_df_cDNA_filt$activity <= bc_df_cDNA_filt$lower_activity] <- "Yes"
-
-# ## Remove reporters with a higher SD than the mean activity
-# bc_df_cDNA_filt <- bc_df_cDNA %>%
-#   mutate(outlier = "No")
-# bc_df_cDNA_filt$outlier[bc_df_cDNA_filt$reporter_activity > 3 & bc_df_cDNA_filt$reporter_activity_sd >= (bc_df_cDNA_filt$reporter_activity)] <- "Yes"
-# 
-# ## Plot the fraction of outliers per sample
-# n_outlier <- bc_df_cDNA_filt %>%
-#   filter(reporter_activity > 0.5) %>%
-#   dplyr::select(outlier, sample_id, reporter_id) %>%
-#   filter(outlier == "Yes") %>%
-#   unique() %>% 
-#   group_by(sample_id) %>%
-#   mutate(n_outlier = length(outlier)) %>%
-#   dplyr::select(-outlier, -reporter_id) %>%
-#   unique()
-# 
-# bc_df_cDNA_filt <- merge(bc_df_cDNA_filt, n_outlier, all = T)
-# bc_df_cDNA_filt$n_outlier[is.na(bc_df_cDNA_filt$n_outlier)] <- 0
-# 
-# plot_ly(bc_df_cDNA_filt %>%
-#           dplyr::select(n_outlier, sample_id) %>%
-#           unique(),
-#         x = ~sample_id, y = ~n_outlier, type = 'bar',
-#              marker = list(color = '#D6D5C9',
-#                            line = list(color = 'rgb(8,48,107)', width = 1.5))) %>% 
-#   layout(title = "Reporters with SD > mean activity per condition",
-#          yaxis = list(title = "Number of outliers"),
-#          xaxis = list(title = "Condition"))
   
 ## Choose arbitrary cutoff to get rid of most extreme outliers
 bc_df_cDNA_remove <- bc_df_cDNA[(bc_df_cDNA$deviation < 0.25 | bc_df_cDNA$deviation > 4 | bc_df_cDNA$n_reporters <= 2) & (bc_df_cDNA$reporter_activity > 2 | bc_df_cDNA$activity > 2),]
@@ -1092,6 +807,7 @@ plt <- ggpairs(bc_df_rep %>% dplyr::select("1", "2", "3", "4", "5"),
 
 print(plt)
 ```
+## Data correlates very well.
 
 ---
 
