@@ -283,7 +283,7 @@ plot_ly(n_highly_expressed, x = ~sample_id, y = ~as.numeric(n_bc), type = 'bar',
          xaxis = list(title = "sample"))
 
 ```
-## The read distribution plots show that the pDNA samples are uniformly distributed. They also show that the MCF7-TP53-WT cells have highly active TP53 reporters, while random reporters got a lot of reads in the MCF7-TP53-KO cells.
+*The read distribution plots show that the pDNA samples are uniformly distributed. They also show that the MCF7-TP53-WT cells have highly active TP53 reporters, while random reporters got a lot of reads in the MCF7-TP53-KO cells.*
 
 
 ---
@@ -342,7 +342,7 @@ for (i in unique(bc_fraction$gcf)) {
   print(p)
 }
 ```
-## Conclusion: All reads are matched to barcodes that come from the reporter library. Very good. All barcodes can be found back. At a cutoff of ~5 rpm, already ~10% of the barcodes are lost. I guess this is to be expected.
+*Conclusion: All reads are matched to barcodes that come from the reporter library. Very good. All barcodes can be found back. At a cutoff of ~5 rpm, already ~10% of the barcodes are lost. I guess this is to be expected.*
 
 ---
 
@@ -393,7 +393,7 @@ pDNA_bias <- pDNA_bias %>%
 bc_df <- bc_df %>%
   filter(sample_id %in% c(pDNA_bias$sample))
 ```
-## Conclusion: None of the samples correlate with the pDNA input, which means that we are actually measuring the abundance of transcribed barcodes in the cDNA.
+*Conclusion: None of the samples correlate with the pDNA input, which means that we are actually measuring the abundance of transcribed barcodes in the cDNA.*
 
 
 ---
@@ -434,7 +434,7 @@ for (i in unique(bc_df_rep$condition)){
   print(plt)
 }
 ```
-## The read counts highly correlate!
+*The read counts highly correlate!*
 
 ---
 
@@ -807,7 +807,7 @@ plt <- ggpairs(bc_df_rep %>% dplyr::select("1", "2", "3", "4", "5"),
 
 print(plt)
 ```
-## Data correlates very well.
+*Data correlates very well.*
 
 ---
 

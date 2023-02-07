@@ -1,31 +1,28 @@
 ---
-title: "P53 library - activity computation - all data combined"
-author:
-- name: Max Trauernicht
-  email: m.trauernicht@nki.nl
-  affiliation: "Netherlands Cancer Institute - van Steensel lab"
-date: "`r format(Sys.time(), "%d/%m/%Y")`"
-output:
-  pdf_document:
-    toc: yes
-    toc_depth: '4'
+title: "TP53 reporter library scan - detailed analysis"
+author: 
+  - name: "Max Trauernicht"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute - van Steensel lab"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output: 
   html_document:
     theme: united
     highlight: pygments
     fig_caption: yes
     code_folding: hide
     df_print: kable
-    toc: yes
+    toc: true
     toc_depth: 4
     toc_float:
-      collapsed: no
+      collapsed: false
 ---
 
 ---
 
 
 ### Introduction
-~18,000 barcoded P53 reporters were probed in MCF7 P53WT/KO cells and stimulated with Nutlin-3a. I previously processed the raw sequencing data, quantified the pDNA data and normalized the cDNA data. In this script, a detailed dissection of the reporter activities will be carried out to understand how P53 drives transcription and to identify the most sensitive P53 reporters.
+~6,000 barcoded TP53 reporters were probed in MCF7 TP53WT/KO cells and stimulated with Nutlin-3a. I previously processed the raw sequencing data, quantified the pDNA data and normalized the cDNA data. In this script, a detailed dissection of the reporter activities will be carried out to understand how TP53 drives transcription and to identify the most sensitive TP53 reporters.
 
 
 ---
