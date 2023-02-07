@@ -387,7 +387,7 @@ ggplot(cDNA_df_neg,
 #   dplyr::select("background_activity" = reporter_activity, sample_id, promoter) %>%
 #   unique()
 
-# For now remove gcf6412
+# Remove low-quality samples
 cDNA_df <- cDNA_df %>%
   filter(sample_id != "MCF7_r1_gcf6412") %>%
   filter(!sample_id %in% c("MCF7_KO_r1_gcf6881", "MCF7_KO_Nutlin_r1_gcf6881", "MCF7_r1_gcf6881", "MCF7_Nutlin_r1_gcf6881"))
