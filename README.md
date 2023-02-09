@@ -1,4 +1,6 @@
-# TP53 reporter scan
+# Systematic dissection of the regulatory logic of transcriptional activation by TP53 binding sites 
+
+[![DOI](https://zenodo.org/badge/298230427.svg)](https://zenodo.org/badge/latestdoi/298230427)
 
 
 **Introduction:**
