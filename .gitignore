@@ -10,6 +10,8 @@
 ._deep_scan_trp53_gr.Rproj
 .html
 analyses/misc
+.*
+!.gitignore
 
 # Folder with all the data
 data/
