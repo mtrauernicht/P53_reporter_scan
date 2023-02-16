@@ -188,6 +188,7 @@ bc_df <- merge(bc_df, metadata_selected, all = T, by = "sample_id")
 
 # First compute reads per million to estimate the relative counts in their respective sample
 bc_df$starcode_counts[is.na(bc_df$starcode_counts)] <- 0
+#bc_df <- bc_df[bc_df$starcode_counts > 0,]
 for (i in unique(bc_df$sample_id)) {
   bc_df$rpm[bc_df$sample_id == i] <- (bc_df$starcode_counts[bc_df$sample_id == i] + 1) / # Adds a pseudocount of 1
     sum(bc_df$starcode_counts[bc_df$sample_id == i]) *1e6
@@ -655,43 +656,6 @@ plot_ly(bc_df_2 %>%
 
 ---
 
-## Reporter activity correlations
-
-```{r compare_activities, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
-## 4: Correlation plots of the replicates
-## Combine replicates of normalized data in 3 different columns
-bc_df_rep <- bc_df[!is.na(bc_df$tf),] %>% 
-  dplyr::select(replicate, activity, barcode, gcf, condition) %>% 
-  mutate(sample_id = paste(replicate, gcf, sep = "_")) %>%
-  distinct(condition, barcode, activity, sample_id) %>%
-  spread(sample_id, activity)
-
-# Correlation matrix plot
-n <- sample(1:nrow(bc_df_rep), 5000)
-boundaries <- seq(from = 0.8, by = 0.05, length.out = 4)
-for (i in unique(bc_df_rep$condition)){
-  plt <- ggpairs(bc_df_rep[bc_df_rep$condition == i,]  %>%
-                   dplyr::select(-barcode, -condition),
-                 upper = list(continuous = corColor),
-               lower = list(continuous = function(data, mapping, ...) {
-                   ggally_points(data = data[n, ], mapping = mapping, alpha = 0.1, size = 0.5) +
-                   geom_abline(slope = 1, lty = "dashed", col = "red") +
-                   theme_bw()}),
-               diag = list(continuous = function(data, mapping, ...) {
-                   ggally_densityDiag(data = data, mapping = mapping, alpha = 0.3, fill = "red") +
-                   theme_bw()})) +
-  ggtitle(paste("Correlation Between Replicates, Condition:", i)) +
-  theme(text = element_text(size = 10)) +
-  xlab("Reporter activity") +
-  ylab("Reporter activity") 
-  #theme_light()
-  
-  print(plt)
-}
-```
-
----
-
 ## Filtering data
 
 ```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
@@ -717,10 +681,37 @@ bc_df_cDNA$n_reporters <- ave(bc_df_cDNA$reporter_id, bc_df_cDNA$reporter_id,
                                   function(x) as.numeric(length(x)))
   
 ## Choose arbitrary cutoff to get rid of most extreme outliers
-bc_df_cDNA_remove <- bc_df_cDNA[(bc_df_cDNA$deviation < 0.25 | bc_df_cDNA$deviation > 4 | bc_df_cDNA$n_reporters <= 2) & (bc_df_cDNA$reporter_activity > 2 | bc_df_cDNA$activity > 2),]
+bc_df_cDNA_remove <- bc_df_cDNA[(bc_df_cDNA$deviation < 0.25 | bc_df_cDNA$deviation > 4 | bc_df_cDNA$n_reporters <= 2) & (bc_df_cDNA$reporter_activity > 2 | bc_df_cDNA$activity > 2),] %>%
+  distinct(reporter_id, sample_id)
+
+## Remove data from reporters that have 0 counts because it is likely that the plasmid didn't make it into the cells
+bc_df_cDNA_remove2 <- bc_df_cDNA[bc_df_cDNA$starcode_counts == 0,] %>%
+  mutate(reporter_id3 = paste(reporter_id, sample_id, paste = "_"))
+bc_df_cDNA_remove2$n_reporters_0 <- ave(bc_df_cDNA_remove2$reporter_id, 
+                                        bc_df_cDNA_remove2$reporter_id, 
+                                        bc_df_cDNA_remove2$sample_id, FUN =
+                                          function(x) as.numeric(length(x)))
+
+## Remove data from reporters where all bcs are 0 - probably those didn't make it into the cell
+bc_df_cDNA_remove3 <- bc_df_cDNA_remove2 %>%
+  filter(n_reporters_0 == n_reporters) %>%
+  distinct(reporter_id, sample_id)
+
+bc_df_cDNA_remove4 <- bc_df_cDNA %>%
+  mutate(reporter_id3 = paste(reporter_id, sample_id, paste = "_")) %>%
+  filter(reporter_id3 %in% bc_df_cDNA_remove2$reporter_id3) %>%
+  filter(!reporter_id3 %in% bc_df_cDNA_remove3$reporter_id3) %>%
+  mutate(max_count = ave(starcode_counts, reporter_id, sample_id, FUN = max)) %>%
+  filter(max_count > 25) %>%
+  filter(starcode_counts == 0) %>%
+  distinct(reporter_id, sample_id)
+
+bc_df_cDNA_remove <- rbind(bc_df_cDNA_remove, bc_df_cDNA_remove4) %>%
+  distinct()
 
 bc_df_cDNA_filt <- bc_df_cDNA %>%
   anti_join(bc_df_cDNA_remove)
+
 
 bc_df_cDNA_filt$n_reporters <- ave(bc_df_cDNA_filt$reporter_id, bc_df_cDNA_filt$reporter_id, 
                                 bc_df_cDNA_filt$sample_id, FUN =
