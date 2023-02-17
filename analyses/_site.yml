@@ -1,0 +1,13 @@
+name: "my-website"
+navbar:
+  title: "TP53 Reporter Scan"
+  left:
+    - text: "Info"
+      href: index.html
+    - text: "Data Quality Checks"
+      href: barcode-processing.html
+    - text: "Detailed Reporter Activity Analysis"
+      href: cDNA-processing.html
+output: 
+  html_document:
+    theme: united

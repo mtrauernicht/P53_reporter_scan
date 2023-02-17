@@ -1,5 +1,5 @@
 ---
-title: "Barcode processing - TP53 Reporter Scan"
+title: "Barcode count pre-processing"
 author: 
   - name: "Max Trauernicht"
     email: "m.trauernicht@nki.nl"
@@ -21,7 +21,7 @@ output:
 ---
 
 ### Aim
-pMT06 (the pDNA library) was transfected into MCF7 cells that are either TP53 proficient or TP53-KO - 24 hours later mRNA was isolated and barcodes were quantified by sequencing together with pMT06 pDNA counts. This was done in three independent replicates.
+pMT06 (the pDNA library) was transfected into MCF7 cells that are either TP53 proficient or TP53-KO - 24 hours later mRNA was isolated and barcodes were quantified by sequencing together with pMT06 pDNA counts. This was done in three independent replicates. In this script the barcode counts will be analyzed and some quality checks will be done.
 
 ---
 
@@ -659,66 +659,66 @@ plot_ly(bc_df_2 %>%
 ## Filtering data
 
 ```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
-## Only keep data based on pDNA counts > 3
-bc_df_2 <- bc_df %>%
-  filter(pDNA_counts_rpm > 3)
-
-## Remove pDNA samples (as I am not interested in their activities)
-bc_df_cDNA <- bc_df_2[-grep("pMT06", bc_df_2$sample),]
-
-## Calculate reporter activities
-bc_df_cDNA$reporter_id <- gsub(".{5}$", "", bc_df_cDNA$reporter_id)
-bc_df_cDNA$reporter_activity <- ave(bc_df_cDNA$activity, bc_df_cDNA$reporter_id, 
-                                bc_df_cDNA$sample_id, FUN =
-                                  function(x) quantile(x, 0.5))
-
-## Remove data points that are 3xSD away from 50% quantile
-bc_df_cDNA$deviation <- bc_df_cDNA$activity / bc_df_cDNA$reporter_activity
-
-# Remove reporters where I only have 2 or less reporters
-bc_df_cDNA$n_reporters <- ave(bc_df_cDNA$reporter_id, bc_df_cDNA$reporter_id, 
-                                bc_df_cDNA$sample_id, FUN =
-                                  function(x) as.numeric(length(x)))
-  
-## Choose arbitrary cutoff to get rid of most extreme outliers
-bc_df_cDNA_remove <- bc_df_cDNA[(bc_df_cDNA$deviation < 0.25 | bc_df_cDNA$deviation > 4 | bc_df_cDNA$n_reporters <= 2) & (bc_df_cDNA$reporter_activity > 2 | bc_df_cDNA$activity > 2),] %>%
-  distinct(reporter_id, sample_id)
-
-## Remove data from reporters that have 0 counts because it is likely that the plasmid didn't make it into the cells
-bc_df_cDNA_remove2 <- bc_df_cDNA[bc_df_cDNA$starcode_counts == 0,] %>%
-  mutate(reporter_id3 = paste(reporter_id, sample_id, paste = "_"))
-bc_df_cDNA_remove2$n_reporters_0 <- ave(bc_df_cDNA_remove2$reporter_id, 
-                                        bc_df_cDNA_remove2$reporter_id, 
-                                        bc_df_cDNA_remove2$sample_id, FUN =
-                                          function(x) as.numeric(length(x)))
-
-## Remove data from reporters where all bcs are 0 - probably those didn't make it into the cell
-bc_df_cDNA_remove3 <- bc_df_cDNA_remove2 %>%
-  filter(n_reporters_0 == n_reporters) %>%
-  distinct(reporter_id, sample_id)
-
-bc_df_cDNA_remove4 <- bc_df_cDNA %>%
-  mutate(reporter_id3 = paste(reporter_id, sample_id, paste = "_")) %>%
-  filter(reporter_id3 %in% bc_df_cDNA_remove2$reporter_id3) %>%
-  filter(!reporter_id3 %in% bc_df_cDNA_remove3$reporter_id3) %>%
-  mutate(max_count = ave(starcode_counts, reporter_id, sample_id, FUN = max)) %>%
-  filter(max_count > 25) %>%
-  filter(starcode_counts == 0) %>%
-  distinct(reporter_id, sample_id)
-
-bc_df_cDNA_remove <- rbind(bc_df_cDNA_remove, bc_df_cDNA_remove4) %>%
-  distinct()
-
-bc_df_cDNA_filt <- bc_df_cDNA %>%
-  anti_join(bc_df_cDNA_remove)
-
-
-bc_df_cDNA_filt$n_reporters <- ave(bc_df_cDNA_filt$reporter_id, bc_df_cDNA_filt$reporter_id, 
-                                bc_df_cDNA_filt$sample_id, FUN =
-                                  function(x) as.numeric(length(x)))
-
-bc_df_cDNA_filt <- bc_df_cDNA_filt %>%
-  filter(n_reporters >= 2)
+# ## Only keep data based on pDNA counts > 3
+# bc_df_2 <- bc_df %>%
+#   filter(pDNA_counts_rpm > 3)
+# 
+# ## Remove pDNA samples (as I am not interested in their activities)
+# bc_df_cDNA <- bc_df_2[-grep("pMT06", bc_df_2$sample),]
+# 
+# ## Calculate reporter activities
+# bc_df_cDNA$reporter_id <- gsub(".{5}$", "", bc_df_cDNA$reporter_id)
+# bc_df_cDNA$reporter_activity <- ave(bc_df_cDNA$activity, bc_df_cDNA$reporter_id, 
+#                                 bc_df_cDNA$sample_id, FUN =
+#                                   function(x) quantile(x, 0.5))
+# 
+# ## Remove data points that are 3xSD away from 50% quantile
+# bc_df_cDNA$deviation <- bc_df_cDNA$activity / bc_df_cDNA$reporter_activity
+# 
+# # Remove reporters where I only have 2 or less reporters
+# bc_df_cDNA$n_reporters <- ave(bc_df_cDNA$reporter_id, bc_df_cDNA$reporter_id, 
+#                                 bc_df_cDNA$sample_id, FUN =
+#                                   function(x) as.numeric(length(x)))
+#   
+# ## Choose arbitrary cutoff to get rid of most extreme outliers
+# bc_df_cDNA_remove <- bc_df_cDNA[(bc_df_cDNA$deviation < 0.25 | bc_df_cDNA$deviation > 4 | bc_df_cDNA$n_reporters <= 2) & (bc_df_cDNA$reporter_activity > 2 | bc_df_cDNA$activity > 2),] %>%
+#   distinct(reporter_id, sample_id)
+# 
+# ## Remove data from reporters that have 0 counts because it is likely that the plasmid didn't make it into the cells
+# bc_df_cDNA_remove2 <- bc_df_cDNA[bc_df_cDNA$starcode_counts == 0,] %>%
+#   mutate(reporter_id3 = paste(reporter_id, sample_id, paste = "_"))
+# bc_df_cDNA_remove2$n_reporters_0 <- ave(bc_df_cDNA_remove2$reporter_id, 
+#                                         bc_df_cDNA_remove2$reporter_id, 
+#                                         bc_df_cDNA_remove2$sample_id, FUN =
+#                                           function(x) as.numeric(length(x)))
+# 
+# ## Remove data from reporters where all bcs are 0 - probably those didn't make it into the cell
+# bc_df_cDNA_remove3 <- bc_df_cDNA_remove2 %>%
+#   filter(n_reporters_0 == n_reporters) %>%
+#   distinct(reporter_id, sample_id)
+# 
+# bc_df_cDNA_remove4 <- bc_df_cDNA %>%
+#   mutate(reporter_id3 = paste(reporter_id, sample_id, paste = "_")) %>%
+#   filter(reporter_id3 %in% bc_df_cDNA_remove2$reporter_id3) %>%
+#   filter(!reporter_id3 %in% bc_df_cDNA_remove3$reporter_id3) %>%
+#   mutate(max_count = ave(starcode_counts, reporter_id, sample_id, FUN = max)) %>%
+#   filter(max_count > 25) %>%
+#   filter(starcode_counts == 0) %>%
+#   distinct(reporter_id, sample_id)
+# 
+# bc_df_cDNA_remove <- rbind(bc_df_cDNA_remove, bc_df_cDNA_remove4) %>%
+#   distinct()
+# 
+# bc_df_cDNA_filt <- bc_df_cDNA %>%
+#   anti_join(bc_df_cDNA_remove)
+# 
+# 
+# bc_df_cDNA_filt$n_reporters <- ave(bc_df_cDNA_filt$reporter_id, bc_df_cDNA_filt$reporter_id, 
+#                                 bc_df_cDNA_filt$sample_id, FUN =
+#                                   function(x) as.numeric(length(x)))
+# 
+# bc_df_cDNA_filt <- bc_df_cDNA_filt %>%
+#   filter(n_reporters >= 2)
 ```
 
 ---
@@ -726,6 +726,8 @@ bc_df_cDNA_filt <- bc_df_cDNA_filt %>%
 ## Technical replicate correlations
 
 ```{r technical_replicate_correlations, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message = FALSE}
+bc_df_cDNA_filt <- read_tsv("../data/mt20230217_bc_df_cDNA_filt.tsv")
+
 ## Combine replicates in 5 different columns
 bc_df_rep <- bc_df_cDNA_filt %>% 
   filter(rand_promoter == "No") %>%
