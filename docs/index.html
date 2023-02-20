@@ -57,17 +57,16 @@ if (window.hljs) {
 
 <!-- Bioschemas metadata -->
 <script type="application/ld+json">
-
 //Property: alternateName
 {
 "@type": "DataCatalog",
-"alternateName": "TP53 Reporter Assay",
-"alternateName": "TP53 Massively Parallel Reporter Assay Data"
-}
-
-//Property: citation
-{
-"@type": "DataCatalog",
+"alternateName": [
+    "TP53 Reporter Assay",
+    "TP53 MPRA",
+    "TP53 Massively Parallel Reporter Assay",
+    "Systematic Review of TP53 Reporter Variants",
+    "EFfect of TP53 binding site architecture on TP53 transcriptional activity"
+  ]  ,
 "citation": {
     "@type": "ScholarlyArticle",
     "headline": "Systematic dissection of the regulatory logic of transcriptional activation by TP53 binding sites",
@@ -75,80 +74,45 @@ if (window.hljs) {
       ""
     ],
     "datePublished": "" // add date
-  }
-}
-
-//Property: dataset
-{
-  "@type": "DataCatalog",
-  "dataset": [
-    {
-      "@type": "Dataset",
-      "@id": "10.5281/zenodo.7624305",
-      "alternateName": "Zenodo supplementary data",
-      "alternateName": "Processed TP53 reporter activities",
-      "alternateName": "Detailed TP53 reporter information"
-    },{
-      "@type": "Dataset",
-      "@id": "https://www.ncbi.nlm.nih.gov/bioproject/PRJNA936070",
-      "alternateName": "Raw sequencing data TP53 reporter assay"
-    }
-  ]
-}
-
-//Property: description
-{
-"@type": "DataCatalog",
- "description": "Systematic query of ..."
-}
-
-//Property: identifier
-{
-"@type": "DataCatalog",
-"identifier": "" // put DOI of the paper here
-}
-
-//Property: keywords
-{
-"@type": "DataCatalog",
+  },
+"description": "More than 1,200 TP53 reporter variants were systematically designed by altering the TP53 binding site affinity, binding site copy number, spacer length, spacer sequences, and core promoter identity. The TP53 reporter pool was probed in MCF7 cells in low, medium, and high TP53 concentrations and reporter activities were quantified to establish a link between TP53 binding site architecture TP53 transcriptional activity.",
 "keywords": [
     "TP53",
     "MPRA",
-    "Reporter Assay",
+    "TP53 Reporter Assay",
     "Massively Parallel Reporter Assay",
-    ""
-  ]
-}
-
-//Property: license
-{
-"@type": "DataCatalog",
-"license": "https://creativecommons.org/licenses/by/4.0/legalcode"
-}
-
-//Property: name
-{
-"@type": "DataCatalog",
-"name": "Systematic dissection of the regulatory logic of transcriptional activation by TP53 binding sites"
-}
-
-//Property: provider
-{
-  "@type": "DataCatalog",
-  "provider": {
+    "TP53 periodical spacing",
+    "Optimal spacing of TP53 binding sites",
+    "TP53 cooperativity",
+    "TP53 reporter sensitivity"
+  ],
+"license": "https://creativecommons.org/licenses/by/4.0/legalcode",
+"name": "Systematic dissection of the regulatory logic of transcriptional activation by TP53 binding sites",
+"provider": {
     "@type": "Organization",
     "name": "Netherlands Cancer Institute (NKI)",
     "url": "https://www.nki.nl"
-  }
+  },
+"url": "https://mtrauernicht.github.io/P53_reporter_scan/",
+"dataset": [
+    {
+      "@type": "Dataset",
+      "@id": "10.5281/zenodo.7624305",
+      "alternateName": [
+      "Zenodo supplementary data",
+      "Processed TP53 reporter activities",
+      "Detailed TP53 reporter information"
+      ]
+    },{
+      "@type": "Dataset",
+      "@id": "https://www.ncbi.nlm.nih.gov/bioproject/PRJNA936070",
+      "alternateName":  [
+      "Raw sequencing reads TP53 reporter assay",
+      "SRA upload TP53 reporter assay"
+      ]
+    }
+  ]
 }
-
-//Property: url
-{
-"@type": "DataCatalog",
-"url": "https://mtrauernicht.github.io/P53_reporter_scan/"
-}
-
-
 </script>
 
 
