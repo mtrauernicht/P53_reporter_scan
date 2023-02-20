@@ -1,0 +1,493 @@
+---
+title: "Barcode processing - P53 Deep Scan"
+author: 
+  - name: "Max Trauernicht"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute - van Steensel lab"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output: 
+  html_document:
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+---
+
+---
+
+### Aim
+pMT06 was transfected into various cell types and mRNA barcode counts were sequenced together with pMT06 pDNA counts. In four different sequencing runs, data for all P53 & GR reporters was collected, and will be analyzed here. 
+
+---
+
+## Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+    $(document).ready(function() {
+      $items = $('div#TOC li');
+      $items.each(function(idx) {
+        num_ul = $(this).parentsUntil('#TOC').length;
+        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+      });
+
+    });
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+  overflow-x: hidden;
+}
+```
+
+
+
+### Libraries
+
+```{r setup, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(data.table)
+library(plyr)
+library(stringr)
+library(ggpubr)
+library(GGally)
+library(vwr)
+library(dplyr)
+library(tibble)
+library(plotly)
+library(ggbeeswarm)
+library(haven)
+library(readr)
+library(parallel)
+library(RColorBrewer)
+library(gridExtra)
+library(pheatmap)
+library(shiny)
+library(factoextra)
+library(ggbiplot)
+library(ggpointdensity)
+library(viridis)
+library(tidyr)
+library(DESeq2)
+library(PCAtools)
+```
+
+
+### Functions
+
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+#Custom functions
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+
+
+# From Fede:
+# ggpairs custom functions
+corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
+
+  x   <- eval_data_col(data, mapping$x)
+  y   <- eval_data_col(data, mapping$y)
+  r   <- cor(x, y, "pairwise.complete.obs")
+  rt  <- format(r, digits = 3)
+  tt  <- as.character(rt)
+  cex <- max(sizeRange)
+
+  # helper function to calculate a useable size
+  percent_of_range <- function(percent, range) {
+    percent * diff(range) + min(range, na.rm = TRUE)
+  }
+
+  # plot correlation coefficient
+  p <- ggally_text(label = tt, mapping = aes(), xP = 0.5, yP = 0.5,
+                   size = I(percent_of_range(cex * abs(r), sizeRange)), color = color, ...) +
+    theme(panel.grid.minor=element_blank(),
+          panel.grid.major=element_blank())
+
+  corColors <- RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")[2:6]
+
+  if (r <= boundaries[1]) {
+    corCol <- corColors[1]
+  } else if (r <= boundaries[2]) {
+    corCol <- corColors[2]
+  } else if (r < boundaries[3]) {
+    corCol <- corColors[3]
+  } else if (r < boundaries[4]) {
+    corCol <- corColors[4]
+  } else {
+    corCol <- corColors[5]
+  }
+
+  p <- p +
+    theme(panel.background = element_rect(fill = corCol))
+
+  return(p)
+}
+
+ggplot_cust <- function(...) ggplot2::ggplot(...) + 
+  scale_color_manual(values = colors_diverse) + 
+  scale_fill_manual(values = colors_diverse)
+
+colors_diverse <- c("#264653", "#2a9d8f", "#e9c46a", "#f4a261", "#e76f51")
+```
+
+
+### Loading data
+
+```{r data import, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Load in barcode counts
+bc_files = list.files('/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/gcf6990/raw-data-analysis/results_E1709/',
+                       full.names=T, patter='*_barcode_counts.tsv')
+bc_files_list <- lapply(bc_files, fread, header = FALSE)
+names(bc_files_list) <- bc_files
+
+bc_files = list.files('/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/gcf6990/raw-data-analysis/results_E1720_E1709/',
+                       full.names=T, patter='*_barcode_counts.tsv')
+bc_files_list2 <- lapply(bc_files, fread, header = FALSE)
+names(bc_files_list2) <- bc_files
+bc_files_list <- c(bc_files_list, bc_files_list2)
+
+# Import TIDE data rep 1
+tide_df <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/TIDE/E1709_20220711/activity_summary.csv") %>%
+  dplyr::select(-X) %>%
+  filter(TF %in% c("SP1", "Random", "low", "high", "pos_ctrl")) %>%
+  filter(condition %in% c("pDNA_minCMV", "MCF7-DMSO_minCMV", "MCF7-Nutlin_minCMV", "MCF7-P53-KO-DMSO_minCMV", "K562_minCMV", "K562-P53-WT_minCMV", "K562-P53-WT-high_minCMV", "K562-P53-MUT_minCMV")) %>%
+  setnames(old = c("activity", "TF"), new = c("rpm", "reporter_id"))
+
+tide_df$reporter_id[tide_df$reporter_id == "SP1"] <- "sp1"
+tide_df$reporter_id[tide_df$reporter_id == "Random"] <- "random"
+tide_df$reporter_id[tide_df$reporter_id == "low"] <- "low_conc"
+tide_df$reporter_id[tide_df$reporter_id == "high"] <- "high_conc"
+tide_df$condition[tide_df$condition == "pDNA_minCMV"] <- "tide_pDNA_minCMV"
+tide_df$condition[tide_df$condition == "MCF7-DMSO_minCMV"] <- "minCMV_WT_tide"
+tide_df$condition[tide_df$condition == "MCF7-Nutlin_minCMV"] <- "minCMV_WT_Nutlin_tide"
+tide_df$condition[tide_df$condition == "MCF7-P53-KO-DMSO_minCMV"] <- "minCMV_KO_tide"
+tide_df$condition[tide_df$condition == "K562_minCMV"] <- "K562_tide"
+tide_df$condition[tide_df$condition == "K562-P53-WT_minCMV"] <- "K562_WT_tide"
+tide_df$condition[tide_df$condition == "K562-P53-WT-high_minCMV"] <- "K562_WT_high_tide"
+tide_df$condition[tide_df$condition == "K562-P53-MUT_minCMV"] <- "K562_mut30_tide"
+
+
+bc_annotation <- data.frame(reporter_id = c("sp1", "random", "low_conc", "high_conc", "pos_ctrl"), 
+                             barcode = c("TCACGT", "TCACGTAG", "TCACGTAGGA", "TCACGTAGGAGA", "TCACGTAGGAGATA"))
+```
+
+### Creating count data frames
+
+```{r cluster_compare, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Generate long dfs (I merge instead of rbind the data frames because I want to include barcodes with 0 counts)
+#bc_df <- bind_rows(bc_list, .id = "column_label")
+
+bc_df <- bind_rows(bc_files_list, .id = "sample_id") %>%
+  dplyr::select(sample_id, "barcode" = V1, "starcode_counts" = V2) %>%
+  mutate(sample_id = gsub(".*_E17[0-9]{2}_(.*)_[A-Z]{8}-[A-Z]{8}_S[0-9]{1,2}_barcode_counts.tsv", "\\1", sample_id))
+
+# Match designed barcodes
+bc_df <- merge(bc_df, bc_annotation, all = T)
+
+# Remove non-matched barcodes
+bc_df <- bc_df[!is.na(bc_df$reporter_id),]
+
+
+# First compute reads per million to estimate the relative counts in their respective sample
+bc_df$starcode_counts[is.na(bc_df$starcode_counts)] <- 0
+for (i in unique(bc_df$sample_id)) {
+  bc_df$rpm[bc_df$sample_id == i] <- (bc_df$starcode_counts[bc_df$sample_id == i] + 1) / # Adds a pseudocount of 1
+    sum(bc_df$starcode_counts[bc_df$sample_id == i]) *1e6
+}
+
+
+
+# Normalize by pDNA data to calculate activities
+bc_df$exp <- "E1709_mCMV"
+bc_df$exp[grep("minP", bc_df$sample_id)] <- "E1709_minP"
+bc_df$exp[grep("^WT.*", bc_df$sample_id)] <- "E1720"
+bc_df$exp[grep("^KO.*", bc_df$sample_id)] <- "E1720"
+
+## rename samples and conditions
+bc_df <- bc_df %>%
+  mutate(sample_id = ifelse(exp == "E1720", gsub("r[1,2]", "r4", sample_id), sample_id))
+bc_df$sample_id <- gsub("^WT", "minCMV_WT", bc_df$sample_id)
+bc_df$sample_id <- gsub("^KO", "minCMV_KO", bc_df$sample_id)
+bc_df$condition <- gsub("(.*)_r[1-4]$", "\\1", bc_df$sample_id)
+
+bc_df <- rbind.fill(bc_df, tide_df)
+
+pDNA_rpm <- bc_df %>%
+  filter(sample_id == "pDNA") %>%
+  dplyr::select(barcode, "pDNA_rpm" = rpm) %>%
+  mutate(exp = "E1720")
+
+pDNA_rpm2 <- bc_df %>%
+  filter(sample_id == "minP_pDNA") %>%
+  dplyr::select(barcode, "pDNA_rpm" = rpm, exp)
+
+pDNA_rpm3 <- bc_df %>%
+  filter(sample_id == "minCMV_pDNA") %>%
+  dplyr::select(barcode, "pDNA_rpm" = rpm, exp)
+
+
+pDNA_rpm <- rbind(pDNA_rpm, pDNA_rpm2, pDNA_rpm3) %>%
+  distinct()
+
+bc_df <- merge(bc_df, pDNA_rpm, all = T, by = c("barcode", "exp"))
+
+
+bc_df <- bc_df %>%
+  mutate(tide = ifelse(str_detect(condition, "tide"), "tide", "seq"))
+
+pDNA_rpm4 <- bc_df %>%
+  filter(condition == "tide_pDNA_minCMV") %>%
+  dplyr::select(reporter_id, "pDNA_rpm_tide" = rpm, tide)
+
+bc_df <- merge(bc_df, pDNA_rpm4, all = T, by = c("reporter_id", "tide"))
+
+bc_df$activity[bc_df$tide == "seq"] <- bc_df$rpm[bc_df$tide == "seq"] / bc_df$pDNA_rpm[bc_df$tide == "seq"]
+bc_df$activity[bc_df$tide == "tide"] <- bc_df$rpm[bc_df$tide == "tide"] / bc_df$pDNA_rpm_tide[bc_df$tide == "tide"]
+
+# Then normalize activities by sp1/random controls
+ctrl_activities <- bc_df %>%
+  filter(reporter_id %in% c("random")) %>%
+  dplyr::select(barcode, sample_id, activity) %>%
+  mutate(ctrl_activity = ave(activity, sample_id, FUN = mean)) %>%
+  distinct(ctrl_activity, sample_id)
+
+bc_df <- merge(bc_df, ctrl_activities, all = T, by = "sample_id")
+
+bc_df$activity_norm <- bc_df$activity / bc_df$ctrl_activity
+
+# Calculate Nutlin-enrichment score
+wt_activities <- bc_df %>%
+  filter(sample_id %in% c("minCMV_WT_r1", "minCMV_WT_r2")) %>%
+  dplyr::select(barcode, sample_id, activity_norm) %>%
+  mutate(wt_activity = ave(activity_norm, barcode, FUN = mean)) %>%
+  distinct(wt_activity, barcode)
+
+bc_df <- merge(bc_df, wt_activities, all = T, by = "barcode")
+
+bc_df$activity_nutlin <- bc_df$activity_norm / bc_df$wt_activity
+
+# Calculate enrichment over KO
+ko_activities <- bc_df %>%
+  filter(sample_id %in% c("minCMV_KO_r1", "minCMV_KO_r2")) %>%
+  dplyr::select(barcode, sample_id, activity_norm) %>%
+  mutate(ko_activity = ave(activity_norm, barcode, FUN = mean)) %>%
+  distinct(ko_activity, barcode)
+
+bc_df <- merge(bc_df, ko_activities, all = T, by = "barcode")
+
+bc_df$activity_ko <- bc_df$activity_norm / bc_df$ko_activity
+
+# Calculate enrichment over K562
+k562_activities <- bc_df %>%
+  filter(sample_id %in% c("K562_r1", "K562_r2", "K562_r3")) %>%
+  dplyr::select(barcode, sample_id, activity_norm) %>%
+  mutate(k562_activity = ave(activity_norm, barcode, FUN = mean)) %>%
+  distinct(k562_activity, barcode)
+
+bc_df <- merge(bc_df, k562_activities, all = T, by = "barcode")
+
+bc_df$activity_k562 <- bc_df$activity_norm / bc_df$k562_activity
+
+bc_df <- bc_df %>%
+  mutate(mean_activity = ave(activity, condition, reporter_id, FUN = mean)) %>%
+  mutate(mean_activity_ko = ave(activity_ko, condition, reporter_id, FUN = mean)) %>%
+  mutate(mean_activity_k562 = ave(activity_k562, condition, reporter_id, FUN = mean)) %>%
+  mutate(mean_activity_norm = ave(activity_norm, condition, reporter_id, FUN = mean)) %>%
+  mutate(mean_activity_nutlin = ave(activity_nutlin, condition, reporter_id, FUN = mean)) %>%
+  filter(!sample_id %in% c("pDNA", "minP_pDNA", "minCMV_pDNA"))
+```
+
+
+## Plot activities
+
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+ggplot(bc_df,
+       aes(x = reporter_id, y = mean_activity)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~condition) +
+  theme_pubr(border = T, x.text.angle = 90)
+
+ggplot(bc_df,
+       aes(x = reporter_id, y = mean_activity_norm)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~condition) +
+  theme_pubr(border = T, x.text.angle = 90)
+
+# ggplot(bc_df,
+#        aes(x = reporter_id, y = mean_activity_norm)) +
+#   geom_bar(stat = "identity") + 
+#   facet_wrap(~condition, scales = "free_y") +
+#   theme_pubr(border = T, x.text.angle = 90)
+# 
+# 
+# ggplot(bc_df %>% 
+#          filter(condition %in% c("K562_WT", "K562_WT_high")),
+#        aes(x = condition, y = mean_activity_k562, color = reporter_id)) +
+#   geom_point() + 
+#   theme_pubr(border = T)
+# 
+# 
+# ggplot(bc_df %>% 
+#          filter(condition %in% c("minCMV_KO", "minCMV_WT_Nutlin")) %>%
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")),
+#        aes(x = condition, y = mean_activity_norm, color = reporter_id)) +
+#   geom_point() + 
+#   theme_pubr(border = T)
+# 
+# ggplot(bc_df %>% 
+#          filter(condition %in% c("minCMV_KO", "minCMV_WT", "K562_WT")) %>%
+#          filter(reporter_id %in% c("low_conc", "pos_ctrl")),
+#        aes(x = reporter_id, y = mean_activity_norm, color = condition)) +
+#   geom_bar(stat = "identity", position = position_dodge(0.75)) + 
+#   theme_pubr(border = T)
+
+
+ggplot_cust(bc_df %>% 
+         filter(condition %in% c("minCMV_KO", "minCMV_WT", "minCMV_WT_Nutlin")) %>%
+         filter(reporter_id %in% c("low_conc", "high_conc", "pos_ctrl")) %>%
+         mutate(condition = factor(condition, levels = c("minCMV_KO", "minCMV_WT", "minCMV_WT_Nutlin"))),
+       aes(x = condition, y = log2(mean_activity_norm), color = reporter_id, group = reporter_id)) +
+  geom_point() +
+  geom_line() +
+  geom_hline(yintercept = 0, lty = "dashed") +
+  theme_pubr(border = T)
+
+# ggplot_cust(bc_df %>% 
+#          filter(condition %in% c("minCMV_KO_tide", "minCMV_WT_tide", "minCMV_WT_Nutlin_tide")) %>%
+#          filter(reporter_id %in% c("low_conc", "high_conc", "pos_ctrl")) %>%
+#          mutate(condition = factor(condition, levels = c("minCMV_KO_tide", "minCMV_WT_tide", "minCMV_WT_Nutlin_tide"))),
+#        aes(x = condition, y = log2(mean_activity_norm), color = reporter_id, group = reporter_id)) +
+#   geom_point() +
+#   geom_line() +
+#   geom_hline(yintercept = 0, lty = "dashed") +
+#   theme_pubr(border = T)
+
+ggplot_cust(bc_df %>% 
+         filter(condition %in% c("K562", "K562_mut30", "K562_WT", "K562_WT_high")) %>%
+         filter(reporter_id %in% c("low_conc", "high_conc", "pos_ctrl")) %>%
+         mutate(condition = factor(condition, levels = c("K562", "K562_mut30", "K562_WT", "K562_WT_high"))),
+       aes(x = condition, y = log2(mean_activity_norm), color = reporter_id, group = reporter_id)) +
+  geom_point() +
+  geom_line() +
+  geom_hline(yintercept = 0, lty = "dashed") +
+  theme_pubr(border = T)
+
+# ggplot_cust(bc_df %>% 
+#          filter(condition %in% c("K562_tide", "K562_mut30_tide", "K562_WT_tide", "K562_WT_high_tide")) %>%
+#          filter(reporter_id %in% c("low_conc", "high_conc", "pos_ctrl")) %>%
+#          mutate(condition = factor(condition, levels = c("K562_tide", "K562_mut30_tide", "K562_WT_tide", "K562_WT_high_tide"))),
+#        aes(x = condition, y = log2(mean_activity_norm), color = reporter_id, group = reporter_id)) +
+#   geom_point() +
+#   geom_line() +
+#   geom_hline(yintercept = 0, lty = "dashed") +
+#   theme_pubr(border = T)
+
+ggplot_cust(bc_df %>% 
+              mutate(condition = gsub("_tide", "", condition)) %>%
+              filter(reporter_id %in% c("low_conc", "high_conc", "pos_ctrl")) %>%
+              distinct(condition, mean_activity_norm, reporter_id, tide) %>%
+           spread(key = "tide", value = "mean_activity_norm"),
+       aes(x = log2(tide), y = log2(seq), color = reporter_id, group = reporter_id)) +
+  geom_point() +
+  geom_abline() +
+  theme_pubr(border = T) +
+  facet_wrap(~condition)
+
+# 
+# 
+# ggplot(bc_df %>% 
+#          filter(condition %in% c("minCMV_KO", "minCMV_WT_Nutlin")) %>%
+#          distinct(condition, mean_activity, reporter_id) %>%
+#          spread(key = "condition", value = "mean_activity"),
+#        aes(x = minCMV_KO, y = minCMV_WT_Nutlin, color = reporter_id)) +
+#   geom_point() + 
+#   theme_pubr(border = T)
+# 
+# ggplot(bc_df %>% 
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")) %>%
+#          filter(condition == "minCMV_WT_Nutlin"),
+#        aes(x = reporter_id, y = mean_activity_nutlin)) +
+#   geom_bar(stat = "identity") + 
+#   theme_pubr(border = T)
+# 
+# 
+# ggplot(bc_df %>% 
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")) %>%
+#          filter(condition == "K562_WT_high"),
+#        aes(x = reporter_id, y = mean_activity_nutlin)) +
+#   geom_bar(stat = "identity") + 
+#   theme_pubr(border = T)
+# 
+# ggplot(bc_df %>% 
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")) %>%
+#          filter(condition %in% c("minCMV_KO", "minCMV_WT_Nutlin", "K562_WT_high")),
+#        aes(x = condition, y = mean_activity_nutlin, color = reporter_id)) +
+#   geom_point() + 
+#   theme_pubr(border = T)
+# 
+# 
+# ggplot(bc_df %>%
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")) %>%
+#          filter(!condition %in% c("minCMV_pDNA", "minP_pDNA", "pDNA", "minP_KO_Nutlin", "minP_KO", "minP_WT", "minP_WT_Nutlin")) %>%
+#          mutate(mean_activity = ave(activity_nutlin, condition, reporter_id, FUN = mean)) %>%
+#          mutate(activity_nutlin = log2(activity_nutlin)),
+#        aes(x = reorder(condition, -mean_activity), y = activity_nutlin))+
+#   geom_point() + 
+#   geom_boxplot() +
+#   facet_wrap(~reporter_id) +
+#   theme_pubr(border = T, x.text.angle = 90)
+# 
+# 
+# ggplot(bc_df %>%
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")) %>%
+#          filter(!condition %in% c("minCMV_pDNA", "minP_pDNA", "pDNA")) %>%
+#          mutate(mean_activity = ave(activity_nutlin, condition, reporter_id, FUN = mean)) %>%
+#          mutate(activity_nutlin = log2(activity_nutlin)),
+#        aes(x = reorder(reporter_id, -mean_activity), y = activity_nutlin))+
+#   geom_point() + 
+#   geom_boxplot() +
+#   facet_wrap(~condition) +
+#   theme_pubr(border = T, x.text.angle = 90)
+# 
+# 
+# ggplot(bc_df %>%
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")),
+#        aes(x = condition, y = log2(activity_k562))) +
+#   geom_point() + 
+#   facet_wrap(~reporter_id) +
+#   theme_pubr(border = T, x.text.angle = 90)
+# 
+# ggplot(bc_df %>%
+#          filter(reporter_id %in% c("high_conc", "low_conc", "pos_ctrl")) %>%
+#          filter(condition == "K562_mut30"),
+#        aes(x = reporter_id, y = log2(mean_activity_norm))) +
+#   geom_bar(stat = "identity") + 
+#   theme_pubr(border = T, x.text.angle = 90)
+
+```
+
+
+
+### Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+

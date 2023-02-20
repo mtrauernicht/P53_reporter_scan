@@ -1,0 +1,378 @@
+---
+title: "Barcode processing - P53 Deep Scan"
+author: 
+  - name: "Max Trauernicht"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute - van Steensel lab"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output: 
+  html_document:
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+---
+
+---
+
+### Aim
+pMT06 was transfected into various cell types and mRNA barcode counts were sequenced together with pMT06 pDNA counts. In four different sequencing runs, data for all P53 & GR reporters was collected, and will be analyzed here. 
+
+---
+
+## Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+    $(document).ready(function() {
+      $items = $('div#TOC li');
+      $items.each(function(idx) {
+        num_ul = $(this).parentsUntil('#TOC').length;
+        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+      });
+
+    });
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+  overflow-x: hidden;
+}
+```
+
+
+
+### Libraries
+
+```{r setup, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(data.table)
+library(plyr)
+library(stringr)
+library(ggpubr)
+library(GGally)
+library(vwr)
+library(dplyr)
+library(tibble)
+library(plotly)
+library(ggbeeswarm)
+library(haven)
+library(readr)
+library(parallel)
+library(RColorBrewer)
+library(gridExtra)
+library(pheatmap)
+library(shiny)
+library(factoextra)
+library(ggbiplot)
+library(ggpointdensity)
+library(viridis)
+library(tidyr)
+library(DESeq2)
+library(PCAtools)
+```
+
+
+### Functions
+
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+#Custom functions
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+
+
+# From Fede:
+# ggpairs custom functions
+corColor <- function(data, mapping, color = I("black"), sizeRange = c(1, 3), ...) {
+
+  x   <- eval_data_col(data, mapping$x)
+  y   <- eval_data_col(data, mapping$y)
+  r   <- cor(x, y, "pairwise.complete.obs")
+  rt  <- format(r, digits = 3)
+  tt  <- as.character(rt)
+  cex <- max(sizeRange)
+
+  # helper function to calculate a useable size
+  percent_of_range <- function(percent, range) {
+    percent * diff(range) + min(range, na.rm = TRUE)
+  }
+
+  # plot correlation coefficient
+  p <- ggally_text(label = tt, mapping = aes(), xP = 0.5, yP = 0.5,
+                   size = I(percent_of_range(cex * abs(r), sizeRange)), color = color, ...) +
+    theme(panel.grid.minor=element_blank(),
+          panel.grid.major=element_blank())
+
+  corColors <- RColorBrewer::brewer.pal(n = 7, name = "RdYlBu")[2:6]
+
+  if (r <= boundaries[1]) {
+    corCol <- corColors[1]
+  } else if (r <= boundaries[2]) {
+    corCol <- corColors[2]
+  } else if (r < boundaries[3]) {
+    corCol <- corColors[3]
+  } else if (r < boundaries[4]) {
+    corCol <- corColors[4]
+  } else {
+    corCol <- corColors[5]
+  }
+
+  p <- p +
+    theme(panel.background = element_rect(fill = corCol))
+
+  return(p)
+}
+```
+
+
+### Loading data
+
+```{r data import, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Load in barcode counts
+bc_files = list.files('/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/gcf6990/raw-data-analysis/results_E1720/',
+                       full.names=T, patter='*_barcode_counts.tsv')
+bc_files_list <- lapply(bc_files, fread, header = FALSE)
+names(bc_files_list) <- bc_files
+
+bc_files = list.files('/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/gcf6990/raw-data-analysis/results_E1720_E1709/',
+                       full.names=T, patter='*_barcode_counts.tsv')
+bc_files_list2 <- lapply(bc_files, fread, header = FALSE)
+names(bc_files_list2) <- bc_files
+bc_files_list <- c(bc_files_list, bc_files_list2)
+
+# Import barcode annotation
+bc_annotation <- read.csv("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/output/mt20211008_follow_up_library_p53_affinity.csv", header = T) %>% 
+  column_to_rownames("X") %>%
+  mutate(reporter_id = gsub("_x", "", seq.name)) %>%
+  mutate(spacing = gsub(".*_s_([1,7]{1})_.*", "\\1", reporter_id)) %>%
+  mutate(n_motifs = gsub("P53_([1,2]{1})_.*", "\\1", reporter_id)) %>%
+  mutate(aff1 = gsub(".*aff1_([0-9]{1,2})_.*", "\\1", reporter_id)) %>%
+  mutate(aff2 = gsub(".*aff2_([0-9]{1,2})", "\\1", reporter_id)) %>%
+  mutate(barcode = gsub(".*CACGACGCTCTTCCGATCT([A-Z]{12}).*", "\\1", seq.text)) %>%
+  distinct(reporter_id, spacing, n_motifs, aff1, aff2, barcode)
+
+bc_annotation2 <- data.frame(reporter_id = c("sp1", "random", "low_conc", "high_conc", "pos_ctrl"), 
+                             barcode = c("TCACGT", "TCACGTAG", "TCACGTAGGA", "TCACGTAGGAGA", "TCACGTAGGAGATA"))
+
+bc_annotation <- rbind.fill(bc_annotation, bc_annotation2)
+```
+
+### Creating count data frames
+
+```{r cluster_compare, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Generate long dfs (I merge instead of rbind the data frames because I want to include barcodes with 0 counts)
+#bc_df <- bind_rows(bc_list, .id = "column_label")
+
+bc_df <- bind_rows(bc_files_list, .id = "sample_id") %>%
+  dplyr::select(sample_id, "barcode" = V1, "starcode_counts" = V2) %>%
+  mutate(sample_id = gsub(".*6990_[0-9]{1,2}_E1720_(.*)_[A-Z]{8}-[A-Z]{8}_S[0-9]{1,2}_barcode_counts.tsv", "\\1", sample_id))
+
+# Match designed barcodes
+bc_df <- merge(bc_df, bc_annotation, all = T)
+
+# Remove non-matched barcodes
+bc_df <- bc_df[!is.na(bc_df$reporter_id),]
+
+
+# First compute reads per million to estimate the relative counts in their respective sample
+bc_df$starcode_counts[is.na(bc_df$starcode_counts)] <- 0
+for (i in unique(bc_df$sample_id)) {
+  bc_df$rpm[bc_df$sample_id == i] <- (bc_df$starcode_counts[bc_df$sample_id == i] + 1) / # Adds a pseudocount of 1
+    sum(bc_df$starcode_counts[bc_df$sample_id == i]) *1e6
+}
+
+# Normalize by pDNA data to calculate activities
+pDNA_rpm <- bc_df %>%
+  filter(sample_id == "E1709_pDNA") %>%
+  dplyr::select(barcode, "pDNA_rpm" = rpm)
+
+bc_df <- merge(bc_df, pDNA_rpm)
+
+bc_df$activity <- bc_df$rpm / bc_df$pDNA_rpm
+
+# Then normalize activities by sp1/random controls
+ctrl_activities <- bc_df %>%
+  filter(reporter_id %in% c("sp1")) %>%
+  dplyr::select(barcode, sample_id, activity) %>%
+  mutate(ctrl_activity = ave(activity, sample_id, FUN = mean)) %>%
+  distinct(ctrl_activity, sample_id)
+
+bc_df <- merge(bc_df, ctrl_activities, all = T, by = "sample_id")
+
+bc_df$activity_norm <- bc_df$activity / bc_df$ctrl_activity
+
+# Calculate Nutlin-enrichment score
+wt_activities <- bc_df %>%
+  filter(sample_id %in% c("WT_r1", "WT_r2")) %>%
+  dplyr::select(barcode, sample_id, activity_norm) %>%
+  mutate(wt_activity = ave(activity_norm, barcode, FUN = mean)) %>%
+  distinct(wt_activity, barcode)
+
+bc_df <- merge(bc_df, wt_activities, all = T, by = "barcode")
+
+bc_df$activity_nutlin <- bc_df$activity_norm / bc_df$wt_activity
+
+# Calculate enrichment over KO
+ko_activities <- bc_df %>%
+  filter(sample_id %in% c("KO_r1", "KO_r2")) %>%
+  dplyr::select(barcode, sample_id, activity_norm) %>%
+  mutate(ko_activity = ave(activity_norm, barcode, FUN = mean)) %>%
+  distinct(ko_activity, barcode)
+
+bc_df <- merge(bc_df, ko_activities, all = T, by = "barcode")
+
+bc_df$activity_ko <- bc_df$activity_norm / bc_df$ko_activity
+
+bc_df <- bc_df %>%
+  mutate(condition = gsub("_r[1-3]{1}$", "", sample_id)) %>%
+  mutate(mean_activity_ko = ave(activity_ko, condition, reporter_id, FUN = mean)) %>%
+  mutate(mean_activity_norm = ave(activity_norm, condition, reporter_id, FUN = mean)) %>%
+  mutate(mean_activity_nutlin = ave(activity_nutlin, condition, reporter_id, FUN = mean)) %>%
+  filter(sample_id != "E1709_pDNA")
+
+```
+
+
+## Plot activities
+
+```{r out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff1 = as.numeric(aff1)) %>%
+         filter(spacing == 7, n_motifs == "1", aff1 != 0) %>%
+         distinct(condition, aff1, mean_activity_norm, reporter_id),
+       aes(x = aff1, y = mean_activity_norm)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~condition) +
+  theme_pubr(border = T)
+
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff1 = as.numeric(aff1)) %>%
+         filter(spacing == 7, n_motifs == "1", aff1 != 0) %>%
+         distinct(condition, aff1, mean_activity_nutlin, reporter_id),
+       aes(x = aff1, y = mean_activity_nutlin)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~condition) +
+  theme_pubr(border = T)
+
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(spacing == 7, n_motifs == "1", aff2 != 0) %>%
+         distinct(condition, aff2, mean_activity_norm, reporter_id),
+       aes(x = aff2, y = mean_activity_norm)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~condition) +
+  theme_pubr(border = T)
+
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(spacing == 7, n_motifs == "1", aff2 != 0) %>%
+         distinct(condition, aff2, mean_activity_nutlin, reporter_id),
+       aes(x = aff2, y = mean_activity_nutlin)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~condition) +
+  theme_pubr(border = T)
+
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(spacing == 7, n_motifs == "1", aff2 != 0) %>%
+         distinct(condition, aff2, mean_activity_ko, reporter_id),
+       aes(x = aff2, y = mean_activity_ko)) +
+  geom_bar(stat = "identity") + 
+  facet_wrap(~condition) +
+  theme_pubr(border = T)
+```
+
+
+## Spacing effects
+```{r}
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(n_motifs == "2", condition == "WT_Nutlin") %>%
+         distinct(condition, aff2, mean_activity_nutlin, spacing) %>%
+         spread(key = "spacing", value = "mean_activity_nutlin"),
+       aes(x = `1`, y = `7`)) +
+  geom_point() + 
+  geom_abline(lty = "dashed") +
+  theme_pubr(border = T)
+
+ggplot(bc_df %>%
+         mutate(aff2 = as.numeric(aff2)) %>%
+         filter(n_motifs == "2", condition == "WT_Nutlin") %>%
+         distinct(condition, aff2, activity, spacing, sample_id, reporter_id),
+       aes(x = spacing, y = activity)) +
+  geom_boxplot() +
+  geom_quasirandom() + 
+  theme_pubr(border = T) 
+
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(n_motifs == "2", condition == "WT_Nutlin") %>%
+         distinct(condition, aff2, mean_activity_nutlin, spacing) %>%
+         spread(key = "spacing", value = "mean_activity_nutlin") %>%
+         mutate(spacing_FC = log2(`1`/`7`)),
+       aes(x = aff2, y = spacing_FC)) +
+  geom_bar(stat = "identity") +
+  geom_hline(yintercept = 0) +
+  theme_pubr(border = T)
+
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(n_motifs == "2", condition == "WT_Nutlin") %>%
+         distinct(condition, aff2, mean_activity_norm, spacing) %>%
+         spread(key = "spacing", value = "mean_activity_norm") %>%
+         mutate(spacing_FC = log2(`1`/`7`)),
+       aes(x = aff2, y = spacing_FC)) +
+  geom_bar(stat = "identity") +
+  geom_hline(yintercept = 0) +
+  theme_pubr(border = T)
+```
+
+
+## Other
+```{r}
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(condition %in% c("WT_Nutlin", "WT"), spacing %in% c(1,7)) %>%
+         distinct(condition, aff1, aff2, mean_activity_norm, spacing) %>%
+         spread(key = "condition", value = "mean_activity_norm") %>%
+         mutate(dif = WT_Nutlin/WT),
+       aes(x = WT, y = WT_Nutlin)) +
+  geom_point() +
+  geom_abline() +
+  theme_pubr(border = T)
+
+ggplot(bc_df %>%
+         mutate(spacing = as.numeric(spacing), aff2 = as.numeric(aff2)) %>%
+         filter(condition == "WT_Nutlin", spacing %in% c(1,7)) %>%
+         distinct(condition, aff1, aff2, mean_activity_norm, spacing, n_motifs, reporter_id),
+       aes(x = n_motifs, y = mean_activity_norm)) +
+  geom_quasirandom() +
+  geom_hline(yintercept = 0) +
+  theme_pubr(border = T) +
+  facet_wrap(~spacing)
+```
+
+
+### Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+

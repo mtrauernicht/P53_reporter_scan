@@ -1,0 +1,378 @@
+---
+title: "XXX"
+author: 
+  - name: "Max Trauernicht"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute - van Steensel lab"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output: 
+  html_document:
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+---
+
+---
+
+### Aim
+I want to know if the chosen P53 binding sites for my reporter assay correlate with upregulated genes stimulated with Nutlin-3a in MCF7 cells.
+
+
+---
+
+## Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+    $(document).ready(function() {
+      $items = $('div#TOC li');
+      $items.each(function(idx) {
+        num_ul = $(this).parentsUntil('#TOC').length;
+        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+      });
+
+    });
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+  overflow-x: hidden;
+}
+
+```
+
+### Libraries
+```{r setup, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(blogdown)
+library(dplyr)
+library(SimRAD)
+library(phylotools)
+library(tidyverse)
+```
+
+### Custom functions
+
+```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+
+# Function to load PWM matrix
+get_pwm_feature_matrix <- function(motif_meta_fn, fimo_fn, db = 2) {
+
+  # validate args
+  valid_dbs <- 1:2
+  if(!db %in% valid_dbs)
+    stop('Invalid db (database version). Please use db=1 (maintained for backward compatibility only) or db=2')
+
+  # db=1 is maintained for backward compatibility only
+  if(db == 1) {
+
+    # read in motif metadata
+    motif_meta    <- read.csv(motif_meta_fn)
+
+    # check whether motif metadata contain essential annotations
+    if(!all(c('PWM.ID', 'Cognate.TF') %in% colnames(motif_meta))) {
+      message('The motif metadata file does not contain the essential columns PWM.ID and Cognate.TF')
+    }
+
+    motif_minimal <- motif_meta[, c('PWM.ID', 'Cognate.TF')]
+
+    # load fimo output --> extract motif id, sequence id and p-value
+    df <- read.table(fimo_fn)
+    df <- df[, c(1, 2, 7)]
+
+    colnames(df) <- c('PWM.ID', 'seqid', 'pval')
+
+    # add TF id
+    df <- merge(df, motif_minimal, by = 'PWM.ID')
+
+    # group motif hits by sequence id
+    l <- split(df, df[['seqid']])
+
+    # multiple PWM and multiple hits possible. Reduce hits to one per TF, keeping best p-val only
+    l <- lapply(l, function(x) {
+      x_by_tf <- split(x, x[['Cognate.TF']], drop = TRUE)
+      x_by_tf <- lapply(x_by_tf, function(y) y[which.min(y$pval), ])
+      do.call('rbind', x_by_tf)
+    })
+
+    # initialize feature matrix
+    n_tf          <- motif_minimal[['Cognate.TF']] %>%
+      unique %>%
+      length
+    n_seq         <- length(l)
+    pwm           <- matrix(1, nrow = n_seq, ncol = n_tf)
+    colnames(pwm) <- (motif_minimal[['Cognate.TF']] %>% unique)
+
+    # replace :: from names of composite motifs
+    colnames(pwm) <- str_replace_all(colnames(pwm), '::', '_')
+
+    # fill in feature matrix
+    for(i in 1 : n_seq) {
+      pwm[i, l[[i]][['Cognate.TF']]] <- l[[i]]$pval
+    }
+
+    # -log10 transform
+    pwm           <- -1 * log10(pwm)
+
+    # coerce to tib and return
+    tib_fimo <- as_data_frame(pwm) %>%
+      mutate(id = names(l))
+      dplyr::select(id, everything())
+
+  }
+
+  # db = 2 (default)
+  else {
+
+    # load metadata
+    tib_meta    <- read_csv(motif_meta_fn) %>%
+      # extract tf symbol from motif id (Cognate_TF unsafe, it can be empty) and replace :: occurrences
+      mutate(tf_symbol = str_remove(ID, '_[0-9]*'),
+             tf_symbol = str_replace(tf_symbol, '::', '_')) %>%
+      dplyr::select(motif_id = `PWM ID`, tf_symbol)
+
+    # load fimo results
+    tib_fimo <- read_tsv(fimo_fn) %>%
+      # extract motif id, sequence id and p-value
+      dplyr::select(motif_id, sequence_name, pval = `p-value`)
+
+    # add tf symbol to fimo results
+    tib_fimo <- tib_fimo %>%
+      left_join(tib_meta, by = 'motif_id') %>%
+      # remove hits with missing motif id (composite pwms)
+      filter(!is.na(tf_symbol))
+
+    # select best hit for each motif and sequence
+    tib_fimo <- tib_fimo %>%
+      group_by(sequence_name, tf_symbol) %>%
+      dplyr::slice(which.min(pval)) %>%
+      ungroup()
+
+    # spread into feature matrix
+    tib_fimo <- tib_fimo %>%
+      mutate(pval = -1 * log10(pval)) %>%
+      dplyr::select(-motif_id) %>%
+      spread(key = tf_symbol, value = pval, fill = 0, drop = TRUE) %>%
+      # perform cosmetics on the id
+      mutate(id = sequence_name) %>%
+      dplyr::select(-c(sequence_name)) %>%
+      dplyr::select(id, everything())
+
+  }
+
+  return(tib_fimo)
+
+}
+```
+
+
+### Load data
+
+```{r}
+## Load in the previously designed sequences 
+tf.df <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/output/tf_df_complete.csv") %>%
+  filter(tf == "Trp53", position == 0, promoter == "mCMV", background == 1, oligo.barcode == 1, spacing == 1 | spacing == 7, 
+         affinity_pos1 == 0, affinity_pos2 == 0, affinity_pos3 == 0, affinity_pos4 == 0) %>%
+  dplyr::select(tf, promoter, spacing, primer1_seq, motif3, space3, motif4, distance.seq, 
+                promoter_sequence, s1_primer, barcode, primer2_seq) %>%
+  unique() %>%
+  mutate(tf = "P53")
+
+
+## Create the desired data frame by adding space for 14 motifs and different spacer-positioning combinations
+ddG <- data.frame("affinity_pos3" = c(0,0,0,0,0,0,0,0,0,0,0,0,0,0,1:14, 1:14),
+                  "affinity_pos4" = c(1:14, 1:14,0,0,0,0,0,0,0,0,0,0,0,0,0,0),
+                  "tf" = "P53")
+tf.df <- merge(tf.df, ddG)
+  
+
+## Fill in the correct motif sequences
+p53_affinities <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/p53_fimo_sequences_affinity.csv")
+zero <- data.frame("ddG" = 0, "Motif" = "")
+p53_affinities <- rbind(p53_affinities, zero)
+
+for (i in unique(p53_affinities$ddG)) {
+  tf.df$motif3[tf.df$affinity_pos3 == i] <- p53_affinities$Motif[p53_affinities$ddG == i]
+  tf.df$motif4[tf.df$affinity_pos4 == i] <- p53_affinities$Motif[p53_affinities$ddG == i]
+}
+
+
+## Add number of motifs
+tf.df$motifs <- 2
+tf.df$motifs[tf.df$motif3 == ""] <- 1
+tf.df$motifs[tf.df$motif4 == ""] <- 1
+
+## Add barcodes (select from previous script the ones that were used for similar active reporters)
+barcode <- read_csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/output/tf_df_complete.csv") %>%
+  filter(tf == "Trp53", position == 0, promoter == "mCMV", background == 1, spacing == 1 | spacing == 7) %>%
+  dplyr::select(barcode) %>%
+  unique()
+barc <- slice_sample(barcode, n = nrow(tf.df))
+tf.df$barcode <- barc$barcode
+
+
+## Paste together sequence names and sequences and remove unwanted double sequences with only one motif
+tf.df$seq.name <- paste(tf.df$tf, "x", tf.df$motifs, tf.df$promoter, "s", tf.df$spacing, "aff1", tf.df$affinity_pos3, "aff2", tf.df$affinity_pos4, sep = "_")
+tf.df$seq.text <- paste(tf.df$primer1_seq, tf.df$motif3, tf.df$space3, tf.df$motif4, tf.df$distance.seq, tf.df$promoter_sequence, tf.df$s1_primer, tf.df$barcode, tf.df$primer2_seq, sep = "")
+tf.df$nchar <- nchar(tf.df$seq.text)
+tf.df2 <- tf.df[tf.df$spacing == 1 & tf.df$motif3 == "",]
+tf.df3 <- tf.df[tf.df$spacing == 1 & tf.df$motif4 == "",]
+tf.df <- tf.df[!tf.df$seq.name %in% tf.df2$seq.name,]
+tf.df <- tf.df[!tf.df$seq.name %in% tf.df3$seq.name,]
+
+
+## Export
+tf.df.export <- tf.df %>%
+  dplyr::select(seq.name, seq.text)
+#write.csv(tf.df.export, "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/library_design/output/mt20211008_follow_up_library_p53_affinity.csv")
+```
+
+---
+
+## 20221004 - In-vitro affinity measurements
+
+```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+spacer2_right <- data.frame(seq.name = "66bp_spacer",
+                      space = "")
+iteration <- 1:1000 # Number of sequences to generate
+spacer2_right <- merge(spacer2_right, iteration, all=T)
+
+# Generate 2000 random spacings between TF motifs
+# GC content ~50%
+set.seed(35232)
+for (i in 1:1000) {
+  spacer2_right$space[spacer2_right$y ==i] <- sim.DNAseq(66, GCfreq = 0.5)
+}
+
+# Prepare .fasta
+spacers_export <- spacer2_right
+spacers_export$seq.name <- paste(spacers_export$seq.name, spacers_export$y, sep = "_")
+
+
+# Assemble sequence to test: 4 flank bases of the flanking sequences + the spacer sequence in the middle
+spacers_export$seq.text <- spacers_export$space
+
+# Write fasta file to run on FIMO script
+spacers_export <- spacers_export %>% select("seq.name", "seq.text") %>% unique()
+#dat2fasta(spacers_export, outfile = "/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/P53_affinity/backgrounds.fasta")
+```
+
+## Run FIMO script
+```{bash run fimo spacings, eval = FALSE}
+# motfn=/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/20170320_pwms_selected.meme
+# odir=/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/P53_affinity/fimo
+# query=/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/P53_affinity/backgrounds.fasta
+
+# nice -n 19 fimo --no-qvalue --thresh 1e-4 --verbosity 1 --o $odir $motfn $query 
+```
+
+
+## load fimo results
+We built a TF motif matrix using -log10 transformed FIMO scores.
+```{r build tf motif matrices db2: tf_check, out.width= "100%", fig.align= "center", echo=FALSE}
+# load motif Metadata --> PWM feature matrix
+tib_spacer  <- get_pwm_feature_matrix(motif_meta_fn = '/home/m.trauernicht/mydata/data/TFDB/natoli_update_2017/fc181127_curated_metadata_no_composite_filt.csv', 
+                                        fimo_fn       = '/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/library_design/P53_affinity/fimo/fimo.tsv',
+                                        db            = 2)
+# convert to binary
+tib_spacer2 <- tib_spacer %>% mutate_if(is.numeric, function(x) ifelse((x==0 | is.na(x)),0,1)) 
+
+# compute rowsums to get cumulative binding
+tib_spacer2$binding <- rowSums(tib_spacer[,2:ncol(tib_spacer)])
+
+# select only cumulative binding and id
+tib_spacer2 <- tib_spacer2 %>%
+  distinct(id,binding)
+
+# Identify spacers that were exlcuded from fimo script (due to 0 hits)
+tib_spacer$id <- gsub("66bp_spacer_", "", tib_spacer$id)
+space_id <- unique(tib_spacer$id)
+space_nohit <- iteration[!iteration %in% space_id]
+
+spacer2_right <- spacer2_right[spacer2_right$y %in% space_nohit,]
+
+spacer2_right <- spacer2_right %>%
+  dplyr::select(space, 'fimo_id' = y)
+```
+
+
+## Assemble sequences
+```{r}
+# As established in the step before:
+spacer2_right <- spacer2_right$space[3]
+
+# From previous designs:
+p53_BS <- data.frame(names = c("0_BS", "1_BS", "2_BS_5bp", "2_BS_11bp"),
+                     sequences = c("", "ATGGACATGTCCGGCCATGTCCAT", "ATGGACATGTCCGGCCATGTCCATAATGGACATGTCCGGCCATGTCCAT", 
+                                   "ATGGACATGTCCGGCCATGTCCATAGACTAGATGGACATGTCCGGCCATGTCCAT"))
+
+spacer1_right <- "GCCTGCT"
+spacer_left <- substr("CGGAGCGAACCGAGTTAG", 14,18)
+
+seq_0_BS <- paste(spacer_left, 
+                  spacer1_right, 
+                  spacer2_right, 
+                  sep = "")
+
+seq_1_BS <- paste(spacer_left, 
+                  p53_BS$sequences[p53_BS$names == "1_BS"], 
+                  spacer1_right, 
+                  substr(spacer2_right, (66-42+1), 66), 
+                  sep = "")
+
+seq_2_BS_5bp <- paste(spacer_left, 
+                  p53_BS$sequences[p53_BS$names == "2_BS_5bp"], 
+                  spacer1_right, 
+                  substr(spacer2_right, (66-17+1), 66), 
+                  sep = "")
+
+seq_2_BS_11bp <- paste(spacer_left, 
+                  p53_BS$sequences[p53_BS$names == "2_BS_11bp"], 
+                  spacer1_right, 
+                  substr(spacer2_right, (66-11+1), 66), 
+                  sep = "")
+
+p53_sequences <- data.frame(names = c("0_BS", "1_BS", "2_BS_5bp", "2_BS_11bp"),
+                     sequences = c(seq_0_BS, seq_1_BS, seq_2_BS_5bp, seq_2_BS_11bp))
+```
+
+
+---
+
+
+## Results
+```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+```
+
+
+### Exporting potential data
+```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+```
+
+
+# Session Info
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
