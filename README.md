@@ -43,6 +43,7 @@ ___
 **Repository guide:**
 
 - analysis folder: pre-processing of the barcode counts (barcode-preprocessing.Rmd) + analysis of barcode counts, linear modeling, figure generation (cDNA-processing.Rmd)
+    - files indicated with #_all# contain data from all three probed cell lines (MCF7, U2OS, A549) whereas the other files only contain the MCF7 data
 - library_design folder: contains script that was used to generate the TP53 reporter sequences
 - pDNA_insert_seq folder: contains scripts to analyze the full-length sequences of the plasmid pool that was used for transfections
 - raw_data_analysis folder: contains the scripts that were used to extract and cluster the raw barcode counts
