@@ -274,9 +274,8 @@ activation from synthetic TP53 binding sites</h1>
 </div>
 
 
-<p><a href="https://doi.org/10.5281/zenodo.7624305"><img
-src="https://zenodo.org/badge/DOI/10.5281/zenodo.7624305.svg"
-alt="DOI" /></a></p>
+<p><a href="https://zenodo.org/badge/latestdoi/298230427"><img
+src="https://zenodo.org/badge/298230427.svg" alt="DOI" /></a></p>
 <p>Website guide: In the “Data Quality Checks” tab plots can be found
 that describe the pre-processing of the barcode counts and quality
 assurance. In the “Detailed Reporter Activity Analysis” tab all figures
@@ -307,8 +306,8 @@ be intact.</p>
 <hr />
 <p><strong>Experimental setup:</strong></p>
 <ul>
-<li>Nucleofection into TP53-proficient MCF7, A549 and U2OS cells, and
-TP53-KO MCF7 cells</li>
+<li>Nucleofection into TP53-proficient MCF7 cells and TP53-KO MCF7
+cells</li>
 <li>TP53 Stimulation with Nutlin-3a or vehicle control (DMSO)</li>
 <li>RNA isolation after 24h, followed by barcode-specific reverse
 transcription and sequencing library prep</li>
@@ -328,7 +327,12 @@ activity (core promoter-only reporters)</li>
 <ul>
 <li>analysis folder: pre-processing of the barcode counts
 (barcode-preprocessing.Rmd) + analysis of barcode counts, linear
-modeling, figure generation (cDNA-processing.Rmd)</li>
+modeling, figure generation (cDNA-processing.Rmd)
+<ul>
+<li>files indicated with #_all# contain data from all three probed cell
+lines (MCF7, U2OS, A549) whereas the other files only contain the MCF7
+data</li>
+</ul></li>
 <li>library_design folder: contains script that was used to generate the
 TP53 reporter sequences</li>
 <li>pDNA_insert_seq folder: contains scripts to analyze the full-length
