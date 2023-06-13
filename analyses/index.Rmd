@@ -13,7 +13,7 @@ Website guide: In the "Data Quality Checks" tab plots can be found that describe
 
 ---
 
-##Introduction:
+**Introduction:**
 
 It is unclear how TP53 binding site architecture relates to TF activity. To test this systematically, a library was designed in collaboration with the Bussemaker lab. Design features of TP53 reporters like binding site copy number, spacer length, or core promoter choice are reviewed.
 
@@ -32,7 +32,7 @@ All TF reporters were designed using FIMO. This way, the spacings were designed 
 
 ---
 
-###Experimental setup:
+**Experimental setup:**
 
 - Nucleofection into TP53-proficient MCF7 cells and TP53-KO MCF7 cells
 - TP53 Stimulation with Nutlin-3a or vehicle control (DMSO)
@@ -41,16 +41,16 @@ All TF reporters were designed using FIMO. This way, the spacings were designed 
 
 ---
 
-###Activity quantification:
+**Activity quantification:**
 
 - reporter activity = cDNA counts / pDNA counts
 - take average across the 5 barcodes
 - then take average across the 3 biological replicates
 - calculate enrichment per condition tested over background reporter activity (core promoter-only reporters)
 
----
+___
 
-###Repository guide:
+**Repository guide:**
 
 - analysis folder: pre-processing of the barcode counts (barcode-preprocessing.Rmd) + analysis of barcode counts, linear modeling, figure generation (cDNA-processing.Rmd)
     - files indicated with #_all# contain data from all three probed cell lines (MCF7, U2OS, A549) whereas the other files only contain the MCF7 data
