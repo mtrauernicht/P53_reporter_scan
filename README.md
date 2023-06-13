@@ -3,7 +3,7 @@
 # Systematic analysis of transcriptional activation from synthetic TP53 binding sites
   
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.7624305.svg)](https://doi.org/10.5281/zenodo.7624305)
+[![DOI](https://zenodo.org/badge/298230427.svg)](https://zenodo.org/badge/latestdoi/298230427)
 
 **Introduction:**
 
