@@ -5,9 +5,9 @@ navbar:
     - text: "Info"
       href: index.html
     - text: "Data Quality Checks"
-      href: barcode-processing.html
+      href: barcode-processing-all.html
     - text: "Detailed Reporter Activity Analysis"
-      href: cDNA-processing.html
+      href: cDNA-processing-all.html
 output: 
   html_document:
     theme: united
