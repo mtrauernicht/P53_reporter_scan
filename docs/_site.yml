@@ -10,4 +10,4 @@ navbar:
       href: cDNA-processing-all.html
 output: 
   html_document:
-    theme: minimal
+    theme: united
