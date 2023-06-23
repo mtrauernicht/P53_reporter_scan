@@ -1,0 +1,793 @@
+---
+title: "genomic P53 response element scoring"
+author: 
+  - name: "Max Trauernicht"
+    email: "m.trauernicht@nki.nl"
+    affiliation: "Netherlands Cancer Institute - van Steensel lab"
+date: '`r format(Sys.time(), "%d/%m/%Y")`'
+output: 
+  html_document:
+    theme: united
+    highlight: pygments
+    fig_caption: yes
+    code_folding: hide
+    df_print: kable
+    toc: true
+    toc_depth: 4
+    toc_float:
+      collapsed: false
+---
+
+---
+
+### Aim
+I want to score the affinity genomic P53 response elements using the same algorithm that was used to create P53 reporters. I then want to test if affinity or number of P53 binding sites in the genome affects transcriptional activity (measured by MPRA or target gene expression).
+
+---
+
+## Setup {.tabset}
+
+<!-- little HTML script to do indentation of the table of contents -->
+<script>
+    $(document).ready(function() {
+      $items = $('div#TOC li');
+      $items.each(function(idx) {
+        num_ul = $(this).parentsUntil('#TOC').length;
+        $(this).css({'text-indent': num_ul * 10, 'padding-left': 0});
+      });
+
+    });
+</script>
+
+```{css, echo = FALSE}
+div.sourceCode {
+  overflow-x: hidden;
+}
+```
+
+### Libraries
+
+```{r setup, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+StartTime <-Sys.time()
+
+# 8-digit Date tag:
+Date <- substr(gsub("-","",Sys.time()),1,8) 
+# libraries:
+library(GenomicRanges)
+library(BSgenome.Hsapiens.UCSC.hg38)
+library(GenomicFeatures)
+library(BSgenome)
+library(spgs)
+library(dplyr)
+library(ggplot2)
+library(reshape)
+library(ggbeeswarm)
+library(biomaRt)
+library(readr)
+library(stringr)
+library(maditr)
+library(phylotools)
+library(plyr)
+library(tidyr)
+library(ggpubr)
+```
+
+
+### Custom functions
+
+```{r, out.width= "80%", fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+SetFileName <- function(filename, initials) {
+  # Set filename with extension and initials to make filename with date integrated.
+  filename <- substitute(filename)
+  initials <- substitute(initials)
+  filename <- paste0(initials, Date, filename)
+  filename
+}
+
+ReadFasta<-function(file) {
+   # Read the file line by line
+   fasta<-readLines(file)
+   # Identify header lines
+   ind<-grep(">", fasta)
+   # Identify the sequence lines
+   s<-data.frame(ind=ind, from=ind+1, to=c((ind-1)[-1], length(fasta)))
+   # Process sequence lines
+   seqs<-rep(NA, length(ind))
+   for(i in 1:length(ind)) {
+      seqs[i]<-paste(fasta[s$from[i]:s$to[i]], collapse="")
+   }
+   # Create a data frame 
+   DF<-data.frame(name=gsub(">", "", fasta[ind]), sequence=seqs)
+   # Return the data frame as a result object from the function
+   return(DF)
+}
+```
+
+
+### Extract all TSSs 
+
+Aim: Extract all sequences 500bp upstream of all TSSs in the human genome.
+```{r, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Import selected TSSs from Christ, gencode.v27
+# Original location: DATA/scratch/usr/c.leemans/projects/meta_gene_plots/cl20200811_TSS_window_TOP_DRB/selection/
+tss_annotated <- read.delim2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/gencode.v27-fantom-selection.txt", header = F, col.names = c("chr", "TSS_position", "transcript_id", "strand", "gene_id", "expr_avg", "n_tissues"))
+
+# Select 500 bp window upstream of TSS
+tss_annotated$promoter_start <- 
+  ifelse(tss_annotated$strand == "+", tss_annotated$TSS_position - 499, tss_annotated$TSS_position + 499)
+
+# Save promoter_start as the lowest value
+tss_annotated$start <- pmin(tss_annotated$TSS_position, tss_annotated$promoter_start)
+tss_annotated$end <- pmax(tss_annotated$TSS_position, tss_annotated$promoter_start)
+tss_annotated$width <- 1 + (tss_annotated$end - tss_annotated$start)
+
+# Extract genomic sequence matching the selected promoter_start to TSS locations
+gr <- makeGRangesFromDataFrame(tss_annotated)
+
+tss_annotated$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg38::Hsapiens, names = gr, as.character = T)
+# # Save file
+# save(tss_annotated, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_affinity_scoring/mt20210308_hg38_promoters-500bp.RData")
+```
+
+### Import scored TSSs
+
+Aim: The sequences extracted in the previous script were scanned using Chaitanya's P53 affinity model. Here, I will load those scored affinities.
+```{r, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Import data
+load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/p53_tss_per_position.Rda")
+
+# # Put the scores of all TSSs into one large data frame - only keep the forward matching
+# tss_scores <- data.frame(matrix(ncol = 477, nrow = 1))
+# names(tss_scores) <- 1:477
+# 
+# count <- 0
+# for (i in unique(names(tss.per.pos$Scores))) {
+#   x <- data.frame(data.frame(tss.per.pos$Scores[i]))[1,]
+#   names(x) <- 1:ncol(x)
+#   tss_scores <- rbind(tss_scores, x)
+#   count <- count + length(i)
+#   print(count)
+# }
+# 
+# tss_scores <- tss_scores[-1,]
+# rownames(tss_scores) <- names(tss.per.pos$Scores)
+# tss_scores <- tss_scores %>%
+#   rownames_to_column(var = "transcript_id")
+load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/mt20200309_tss_scored_affinity.RData")
+
+
+tss_scores <- merge(tss_annotated, tss_scores)
+
+tss_scores[, "max"] <- apply(tss_scores[, 13:489], 1, max)
+```
+
+
+
+### Import MCF7 RNA-seq gene list
+
+Aim: Match which TSSs are corresponding to genes that are upregulated upon Nutlin-3a treatment in MCF7 cells. I can then find out if those have (high-affinity) P53 BSs. 
+```{r mcf7_up_down_scoring, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Import genes that are differentially expressed according to Aerts paper (Janky et al., iRegulon)
+geneSet1 <- read.delim2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/mcf7_nutlin_upregulated_GSE47041.txt",
+                        stringsAsFactors = F) %>%
+  mutate(nutlin = "upregulated")
+geneSet2 <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/mcf7_nutlin_downregulated.csv",
+                      stringsAsFactors = F) %>%
+  mutate(nutlin = "downregulated")
+
+# Annotate the tss data frame with the gene symbols
+# ensembl <- useMart("ensembl")
+# mart <- useDataset("hsapiens_gene_ensembl", mart = ensembl)
+# genes <- tss_scores$gene_id
+# genes <- gsub("[.].*","",genes)
+# G_list <- getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id","hgnc_symbol"),values=genes,mart= mart)
+# save(G_list, file = "/DATA/usr/m.trauernicht/data/gene_id_hgnc_converstion.RData")
+load("/DATA/usr/m.trauernicht/data/gene_id_hgnc_converstion.RData")
+G_list <- G_list %>% 
+  dplyr::select("genes" = hgnc_symbol, ensembl_gene_id)
+tss_scores$ensembl_gene_id <- gsub("[.].*","",tss_scores$gene_id)
+tss_scores <- merge(tss_scores, G_list, all = T)
+
+
+# Add up-or downregulated information to tss data frame
+tss_scores <- Reduce(function(x, y) merge(x, y, all = T, by = "genes"), list(tss_scores, geneSet1, geneSet2))
+tss_scores$nutlin.x[is.na(tss_scores$nutlin.x)] <- ""
+tss_scores$nutlin.y[is.na(tss_scores$nutlin.y)] <- ""
+tss_scores$nutlin <- paste(tss_scores$nutlin.x, tss_scores$nutlin.y, sep = "")
+tss_scores$nutlin[tss_scores$nutlin == ""] <- "unchanged"
+tss_scores <- tss_scores %>%
+  dplyr::select(-nutlin.x, -nutlin.y) %>% 
+  unique()
+```
+
+
+
+### Load the P53-reporter affinities
+
+Aim: Import affinity scores from my P53 reporter library.
+```{r, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Import data
+load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/p53_per_position.Rda")
+
+# Put the scores of all TSSs into one large data frame - only keep the forward matching
+# reporter_scores <- data.frame(matrix(ncol = 215, nrow = 1))
+# names(reporter_scores) <- 1:215
+# 
+# for (i in unique(names(per.pos$Scores))) {
+#   x <- data.frame(data.frame(per.pos$Scores[i]))[1,]
+#   names(x) <- 1:ncol(x)
+#   rownames(x) <- i
+#   reporter_scores <- rbind.fill(reporter_scores, x)
+# }
+# reporter_scores <- reporter_scores[-1,]
+# rownames(reporter_scores) <- names(per.pos$Scores)
+# reporter_scores <- reporter_scores %>%
+#   rownames_to_column(var = "reporter_id")
+load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/reporter_affinity_scores.RData")
+```
+
+
+### Extract P53 RE sequences
+
+Aim: Import sequences that were previously used in P53 MPRAs. Those I can then scan using Chaitanya's model.
+```{r ChIP_extraction, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Curated list of P53 targets (Nguyen et al. 2018, NAS, Supplementary Table ST8)
+nguyen_p53_REs <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/ST8-p53 cistrome targets.csv") %>%
+  mutate(p53RE.center = round((p53RE.start + p53RE.end) / 2),
+         p53RE.start = p53RE.center - 500,
+         p53RE.end = p53RE.center + 500,
+         width = p53RE.end - p53RE.start) %>%
+  dplyr::select('chr' = Chr, 'start' = p53RE.start, 'end' = p53RE.end, 'gene' = Current.p53.cistrome.Gene.Symbol, width)
+
+gr <- makeGRangesFromDataFrame(nguyen_p53_REs)
+
+nguyen_p53_REs$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg19::Hsapiens, names = gr, as.character = T)
+
+nguyen_p53_REs <- nguyen_p53_REs %>%
+  mutate(name = paste("nguyen", gene, sep = "_")) %>%
+  dplyr::select(name, seq, chr, start)
+
+
+# Curated list of P53 targets (Haran et al. 2018)
+haran_p53_REs <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/haran_p53RE_curated.csv") %>%
+  dplyr::select("gene" = Gene.site.name, RE.chromosomal.location) %>%
+  mutate(RE.chromosomal.location = gsub("crr", "chr", RE.chromosomal.location))
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(RE.chromosomal.location = gsub(" -", "-", RE.chromosomal.location))
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(RE.chromosomal.location = gsub(" ", "-", RE.chromosomal.location))
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(chr = gsub("(chr[A-z0-9]{1,2}).*", "\\1", RE.chromosomal.location))
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(start = as.numeric(gsub(".*:(.*)-.*", "\\1", RE.chromosomal.location)))
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(end = as.numeric(gsub(".*-(.*)", "\\1", RE.chromosomal.location)))
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(center = round((start + end)/2))
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(start = center - 500)
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(end = center + 500)
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(width = end - start)
+haran_p53_REs <- haran_p53_REs %>% 
+  dplyr::select(gene, chr, start, end, width) %>%
+  unique()
+haran_p53_REs <- haran_p53_REs[-251,]
+
+gr <- makeGRangesFromDataFrame(haran_p53_REs)
+
+haran_p53_REs$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg19::Hsapiens, names = gr, as.character = T)
+
+haran_p53_REs <- haran_p53_REs %>%
+  mutate(name = paste("haran", gene, sep = "_")) %>%
+  dplyr::select(name, seq)
+
+
+p53_REs <- rbind(nguyen_p53_REs, haran_p53_REs)
+p53_REs <- p53_REs[!duplicated(p53_REs$seq),]
+
+
+# Save to score sequences
+p53_REs_export <- p53_REs
+
+# Add other sequences: pMT02 reporters
+pMT02_P53 <- ReadFasta("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/output/mt20210111_oligo_pool.fasta") %>%
+  filter(str_detect(name, "Trp53")) %>%
+  setnames("sequence", "seq") %>%
+  mutate(name = paste("pMT02", name, sep = "_"))
+
+
+# Add other sequences: published reporter sequences
+pMT09_P53 <- ReadFasta("/DATA/usr/m.trauernicht/projects/SuRE-TF/data/library_design/gen-2/mt20210114_oligo_pool_gen2.fasta") %>%
+  filter(str_detect(name, "P53")) %>%
+  setnames("sequence", "seq") %>%
+  mutate(name = paste("pMT09", name, sep = "_"))
+
+p53_REs_export <- rbind.fill(p53_REs_export, pMT02_P53)
+p53_REs_export <- rbind.fill(p53_REs_export, pMT09_P53)
+
+
+# Add other sequences: regions from Younger et al.
+younger_p53_REs <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/younger_et_al_genomic_p53_REs.csv") %>%
+  setnames("Sequence", "seq") %>%
+  mutate(name = paste("younger", Chrom, Start, sep = "_")) %>%
+  dplyr::select(name, seq)
+
+p53_REs_export <- rbind.fill(p53_REs_export, younger_p53_REs)
+
+# Add other sequences: regions from Aerts paper
+aerts_p53_REs <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/aerts_P53_REs.csv") %>%
+  dplyr::select("name" = corresponding.peak.name, chr, start, stop) %>%
+  filter(str_detect(chr, "chr"))
+
+gr <- makeGRangesFromDataFrame(aerts_p53_REs)
+
+aerts_p53_REs$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg19::Hsapiens, names = gr, as.character = T)
+
+aerts_p53_REs <- aerts_p53_REs %>%
+  mutate(name = paste("aerts_design", name, sep = "_"))
+
+
+aerts_p53_REs_peak <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/aerts_P53_REs.csv") %>%
+  dplyr::select("name" = corresponding.peak.name, "chr" = Chr, "start" = start.1, "stop" = stop.1) %>%
+  filter(str_detect(chr, "chr"))
+
+gr <- makeGRangesFromDataFrame(aerts_p53_REs_peak)
+
+aerts_p53_REs_peak$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg19::Hsapiens, names = gr, as.character = T)
+
+aerts_p53_REs_peak <- aerts_p53_REs_peak %>%
+  mutate(name = paste("aerts_peak", name, sep = "_"))
+
+aerts_p53_REs <- rbind.fill(aerts_p53_REs_peak, aerts_p53_REs)
+
+aerts_p53_REs <- aerts_p53_REs %>%
+  dplyr::select(name, seq)
+
+aerts_p53_REs <- aerts_p53_REs[!duplicated(aerts_p53_REs$seq),]
+
+p53_REs_export <- rbind.fill(p53_REs_export, aerts_p53_REs)
+
+p53_REs_export$seq <- toupper(p53_REs_export$seq)
+
+# # Save file
+# save(p53_REs_export, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_affinity_scoring/mt20210412_p53_REs.RData")
+```
+
+
+### Import P53-RE scores
+
+Aim: Import scored P53 response elements.
+```{r, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
+# Import data
+load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/p53_REs_per_position.Rda")
+
+# # Put the scores of all REs into one large data frame - only keep the forward matching
+# RE_scores <- data.frame(matrix(ncol = 1502, nrow = 1))
+# names(RE_scores) <- 1:1502
+# 
+# count <- 0
+# for (i in unique(names(re.per.pos$Scores))) {
+#   x <- data.frame(data.frame(re.per.pos$Scores[i]))[1,]
+#   names(x) <- 1:ncol(x)
+#   RE_scores <- rbind.fill(RE_scores, x)
+#   count <- count + length(i)
+#   print(count)
+#   RE_scores$RE[count+1] <- i
+# }
+# 
+# RE_scores <- RE_scores[-1,]
+# 
+# save(RE_scores, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_affinity_scoring/mt20200504_RE_scores_df.RData")
+
+load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/mt20200504_RE_scores_df.RData")
+
+RE_scores[, "max"] <- apply(RE_scores[, 1:1502], 1, max, na.rm = T)
+```
+
+
+
+
+## Highlights: affinity scores of genomic P53-REs
+
+```{r}
+p <- RE_scores_filt %>% filter(RE == "nguyen_CDKN1A") 
+
+ggplot(data = p, 
+       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+           y = affinity)) +
+  geom_line() +
+  theme_bw() +
+  xlab("distance to RE center (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+  xlim(-50,50) +
+  ggtitle("P53 affinity across CDKN1A RE")
+
+
+p <- RE_scores_filt %>% filter(RE == "younger_chr7_121151311") 
+
+ggplot(data = p, 
+       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+           y = affinity)) +
+  geom_line() +
+  theme_bw() +
+  xlab("distance to RE center (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+  ggtitle("P53 affinity across younger_chr7_121151311")
+
+p <- RE_scores_filt %>% filter(RE == "nguyen_GADD45A") 
+
+ggplot(data = p, 
+       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+           y = affinity)) +
+  geom_line() +
+  theme_bw() +
+  xlab("distance to RE center (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+  xlim(-50,50) +
+  labs(title = "P53 affinity across GADD45A RE",
+       subtitle = "promega reporter & only 1 mismatch from consensus")
+
+
+p <- RE_scores_filt %>% filter(RE == "haran_MDM2_RE1")
+
+ggplot(data = p, 
+       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+           y = affinity)) +
+  geom_line() +
+  theme_bw() +
+  xlab("distance to RE center (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+  xlim(-50,50) +
+  labs(title = "P53 affinity across MDM2 RE",
+       subtitle = "two adjacent binding sites")
+
+p <- RE_scores_filt %>% filter(RE == "nguyen_FOSL1")
+
+ggplot(data = p, 
+       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+           y = affinity)) +
+  geom_line() +
+  theme_bw() +
+  xlab("distance to RE center (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+  xlim(-50,50) +
+  labs(title = "P53 affinity across FOSL1 RE",
+       subtitle = "two adjacent binding sites")
+
+
+# Take the highest 20
+relevant <- c("aerts", "younger", "haran", "nguyen")
+p <- RE_scores_filt[grep(paste(relevant, collapse = "|"), RE_scores_filt$RE),] %>% 
+  arrange(desc(max)) %>% 
+  top_n(20)
+
+p <- RE_scores_filt[RE_scores_filt$RE %in% p$RE,]
+
+ggplot(data = p %>% 
+         arrange(desc(max)), 
+       aes(x = as.numeric(position), 
+           y = affinity)) +
+  geom_line() +
+  theme_bw() +
+  xlab("position (bp)")+
+  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+  ylab("affinity relative to perfect match")+
+  labs(title = "P53 affinity - highest matches") +
+  facet_wrap(~RE, scales = "free_x", ncol = 3)
+
+ggplot(data = p, 
+       aes(x = as.numeric(position), 
+           y = affinity,
+           color = RE)) +
+  geom_line() +
+  theme_bw() +
+  xlab("distance to RE center (bp)")+
+  ylab("affinity relative to perfect match")+
+  labs(title = "P53 affinity across FOSL1 RE",
+       subtitle = "two adjacent binding sites")
+
+```
+
+
+
+
+## Define a set of REs to focus on
+```{r}
+## Choose only sequences from Aerts paper
+RE_scores_aerts <- RE_scores %>%
+  pivot_longer(cols = c(-max, -RE), names_to = "position", values_to = "affinity") %>%
+  #filter(affinity >= 0.000025) %>%
+  filter(str_detect(RE, "aerts"))
+
+reporter_scores_neg_ctrls <- reporter_scores %>%
+  filter(affinity_id == "1_null_only") %>%
+  dplyr::select(-neg_ctrls) %>%
+  pivot_longer(cols = c(-affinity_id, -reporter_id)) %>%
+  mutate(max = ave(value, reporter_id, FUN = function(x) max(x, na.rm = T))) %>%
+  distinct(reporter_id, max)
+
+## Define set used for characterizing genomic TP53 BSs
+RE_scores_aerts_peak <- RE_scores_all %>%
+  filter(str_detect(RE, "aerts_peak"))
+
+## Define set with matched MPRA activities
+RE_scores_aerts_design <- RE_scores_all %>%
+  filter(str_detect(RE, "aerts_design"))
+```
+
+
+---
+
+## What is the affinity distribution of genomic TP53 BSs compared to my selected BSs?
+```{r}
+RE_scores_aerts_peak_max <- RE_scores_aerts_peak %>%
+  distinct(RE, max)
+
+ggplot(RE_scores_aerts_peak_max %>%
+         mutate(rank = rank(-max)) %>%
+         filter(rank < 250),
+       aes(x = "", y = max)) +
+  geom_hline(yintercept = 1, lty = 3, color = "red") +
+  geom_hline(yintercept = 0.3708171, lty = 3, color = "red") +
+  geom_hline(yintercept = 0.1382304, lty = 3, color = "red") +
+  geom_hline(yintercept = 0.05752735, lty = 3, color = "red") +
+  #geom_hline(yintercept = 0.004223629, lty = 3, color = "blue") +
+  geom_quasirandom() +
+  theme_pubr() +
+  xlab("Top 250 TP53 REs") +
+  ylab("Relative affinity")
+
+ggplot(RE_scores_aerts_peak_max %>%
+         mutate(rank = rank(-max)),
+       aes(x = "x", y = log10(max))) +
+  geom_hline(yintercept = log10(1), lty = 3, color = "red") +
+  geom_hline(yintercept = log10(0.3708171), lty = 3, color = "red") +
+  geom_hline(yintercept = log10(0.1382304), lty = 3, color = "red") +
+  geom_hline(yintercept = log10(0.05752735), lty = 3, color = "red") +
+  geom_hline(yintercept = log10(6.162213e-05), lty = 3, color = "black") + 
+  geom_hline(yintercept = log10(1.148827e-06), lty = 3, color = "black") +
+  geom_hline(yintercept = log10(0.0001), lty = 3, color = "green") +
+  geom_hline(yintercept = log10(0.004223629), lty = 3, color = "blue") +
+  geom_quasirandom() +
+  theme_pubr() +
+  xlab("All TP53 REs") +
+  ylab("Relative affinity (log10)")
+```
+
+---
+
+## How often do adjacent TP53 BSs occur in the genome?
+```{r}
+RE_scores_aerts_peak_n_BS <- RE_scores_aerts_peak %>%
+  filter(affinity > 0.0001) %>%
+  mutate(position = as.numeric(position)) %>%
+  mutate(max_position = ave(position, RE, FUN = function(x) max(x, na.rm = T))) %>%
+  mutate(min_position = ave(position, RE, FUN = function(x) min(x, na.rm = T))) %>%
+  mutate(dif = max_position - min_position)
+
+## Keep only the highest value for overlapping BSs
+RE_scores_aerts_peak_n_BS_overlap <- RE_scores_aerts_peak_n_BS %>%
+  filter(dif < 20) %>%
+  group_by(RE) %>%
+  slice_max(n = 1, order_by = affinity, with_ties = T) %>%
+  ungroup()
+
+RE_scores_aerts_peak_n_BS <- RE_scores_aerts_peak_n_BS %>%
+  filter(dif >= 20) %>%
+  rbind(RE_scores_aerts_peak_n_BS_overlap) %>%
+  #filter(dif <= 70) %>%
+  add_count(RE)
+
+## All REs with 3 or 4 BSs have actually only 2 BSs with overlapping BSs - I will merge those here
+RE_scores_aerts_peak_n_BS_overlap_2 <- RE_scores_aerts_peak_n_BS %>%
+  filter(n > 2) %>%
+  filter(n < 5) %>%
+  group_by(RE) %>%
+  slice_max(n = 2, order_by = affinity, with_ties = T) %>%
+  ungroup()
+
+## There is one RE with 5 BSs that actually consists of 3 overlapping BSs - I will merge those here
+RE_scores_aerts_peak_n_BS_overlap_3 <- RE_scores_aerts_peak_n_BS %>%
+  filter(n == 5) %>%
+  group_by(RE) %>%
+  slice_max(n = 3, order_by = affinity, with_ties = T) %>%
+  ungroup()
+
+RE_scores_aerts_peak_n_BS <- RE_scores_aerts_peak_n_BS %>%
+  filter(n <= 2) %>%
+  rbind(RE_scores_aerts_peak_n_BS_overlap_2) %>%
+  rbind(RE_scores_aerts_peak_n_BS_overlap_3) %>%
+  add_count(RE)
+
+
+ggplot(RE_scores_aerts_peak_n_BS,
+       aes(x = nn)) +
+  geom_bar(stat = "count") +
+  theme_pubr() +
+  xlab("Number of BSs")
+
+ggplot(RE_scores_aerts_peak_n_BS %>%
+         filter(dif < 70),
+       aes(x = nn)) +
+  geom_bar(stat = "count") +
+  theme_pubr() +
+  xlab("Number of BSs (<50 bp apart)")
+```
+
+---
+
+## What is the spacer length distribution between adjacent genomic TP53 BSs?
+```{r}
+ggplot(RE_scores_aerts_peak_n_BS %>%
+         filter(nn > 1) %>%
+         distinct(RE, dif),
+       aes(x = dif - 20)) +
+  geom_bar(stat = "count") +
+  theme_pubr() +
+  xlab("BS-BS spacer length")
+
+ggplot(RE_scores_aerts_peak_n_BS %>%
+         filter(dif < 70) %>%
+         filter(nn > 1) %>%
+         distinct(RE, dif),
+       aes(x = dif - 20)) +
+  geom_bar(stat = "count") +
+  theme_pubr() +
+  xlab("BS-BS spacer length")
+```
+
+---
+
+## What is the relation between MPRA activity (or target gene expression) and TP53 BS affinity?
+```{r}
+aerts_p53_REs_activity2 <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/aerts_p53_activities2.csv") %>%
+  dplyr::select("RE" = corresponding.peak.name, expression, padj)
+
+RE_scores_aerts_design_activity <- RE_scores_aerts_design %>%
+  distinct(RE, max) %>%
+  filter(max > 0.0001) %>%
+  mutate(RE = gsub("aerts_design_", "", RE)) %>%
+  left_join(aerts_p53_REs_activity2)
+
+ggplot(RE_scores_aerts_design_activity,
+       aes(x = max, y = expression)) +
+  #geom_vline(xintercept = 1, lty = 3, color = "red") +
+  #geom_vline(xintercept = 0.3708171, lty = 3, color = "red") +
+  geom_vline(xintercept = 0.1382304, lty = 3, color = "red") +
+  geom_vline(xintercept = 0.05752735, lty = 3, color = "red") +
+  geom_point(aes(color = ifelse(padj < 0.05, "yes", "no"))) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_manual(values = c("yes" = "red", "no" = "black")) +
+  theme_pubr() +
+  xlab("Relative affinity") +
+  ylab("MPRA activity - Nutlin-3a induction")
+
+ggplot(RE_scores_aerts_design_activity,
+       aes(x = log10(max), y = expression)) +
+  #geom_vline(xintercept = log10(1), lty = 3, color = "red") +
+  #geom_vline(xintercept = log10(0.3708171), lty = 3, color = "red") +
+  geom_vline(xintercept = log10(0.1382304), lty = 3, color = "red") +
+  geom_vline(xintercept = log10(0.05752735), lty = 3, color = "red") +
+  geom_point(aes(color = ifelse(padj < 0.05, "yes", "no"))) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_manual(values = c("yes" = "red", "no" = "black")) +
+  theme_pubr() +
+  xlab("Relative affinity (log10)") +
+  ylab("MPRA activity - Nutlin-3a induction")
+```
+
+---
+
+## How active are elements with 1 TP53 BS vs. elements with multiple TP53 BSs?
+```{r}
+BS_df <- RE_scores_aerts_peak_n_BS %>%
+  distinct(RE, dif, nn, n) %>%
+  mutate(RE = gsub("aerts_peak_", "", RE)) %>%
+  mutate(overlap = ifelse(n == nn, "no", "yes")) %>%
+  mutate(overlap = ifelse(dif < 20 & dif > 0, "yes", overlap))
+
+RE_scores_aerts_design_activity_nBS <- RE_scores_aerts_design_activity %>%
+  left_join(BS_df) %>%
+  na.omit()
+
+ggplot(RE_scores_aerts_design_activity_nBS,
+       aes(x = as.factor(nn), y = expression)) +
+  geom_quasirandom() +
+  geom_boxplot(alpha = .4, outlier.shape = NA) +
+  theme_pubr() +
+  xlab("Number of TP53 BSs") +
+  ylab("MPRA activity - Nutlin-3a induction")
+
+t.test(RE_scores_aerts_design_activity_nBS$expression[RE_scores_aerts_design_activity_nBS$nn ==1], RE_scores_aerts_design_activity_nBS$expression[RE_scores_aerts_design_activity_nBS$nn ==2])$p.val
+
+ggplot(RE_scores_aerts_design_activity_nBS,
+       aes(x = as.factor(nn), y = expression)) +
+  geom_quasirandom(aes(color = overlap)) +
+  geom_boxplot(alpha = .4, outlier.shape = NA) +
+  theme_pubr() +
+  xlab("Number of TP53 BSs") +
+  ylab("MPRA activity - Nutlin-3a induction")
+
+ggplot(RE_scores_aerts_design_activity_nBS,
+       aes(x = as.factor(n), y = expression)) +
+  geom_quasirandom(aes(color = overlap)) +
+  geom_boxplot(alpha = .4, outlier.shape = NA) +
+  theme_pubr() +
+  xlab("Number of TP53 BSs") +
+  ylab("MPRA activity - Nutlin-3a induction")
+
+
+ggplot(RE_scores_aerts_design_activity_nBS,
+       aes(x = as.factor(nn), y = expression)) +
+  geom_quasirandom(aes(color = log10(max))) +
+  geom_boxplot(alpha = .4, outlier.shape = NA) +
+  theme_pubr() +
+  scale_color_viridis_c(option = "D") +
+  xlab("Number of TP53 BSs") +
+  ylab("MPRA activity - Nutlin-3a induction")
+
+ggplot(RE_scores_aerts_design_activity_nBS,
+       aes(x = log10(max), y = expression)) +
+  #geom_vline(xintercept = log10(1), lty = 3, color = "red") +
+  #geom_vline(xintercept = log10(0.3708171), lty = 3, color = "red") +
+  geom_vline(xintercept = log10(0.1382304), lty = 3, color = "red") +
+  geom_vline(xintercept = log10(0.05752735), lty = 3, color = "red") +
+  geom_point(aes(color = ifelse(padj < 0.05, "yes", "no"))) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_manual(values = c("yes" = "red", "no" = "black")) +
+  theme_pubr() +
+  xlab("Relative affinity (log10)") +
+  ylab("MPRA activity - Nutlin-3a induction") +
+  facet_wrap(~nn)
+
+ggplot(RE_scores_aerts_design_activity_nBS,
+       aes(x = max, y = expression)) +
+  #geom_vline(xintercept = log10(1), lty = 3, color = "red") +
+  #geom_vline(xintercept = log10(0.3708171), lty = 3, color = "red") +
+  geom_vline(xintercept = 0.1382304, lty = 3, color = "red") +
+  geom_vline(xintercept = 0.05752735, lty = 3, color = "red") +
+  geom_point(aes(color = ifelse(padj < 0.05, "yes", "no"))) +
+  geom_smooth(method = "lm", color = "black") +
+  scale_color_manual(values = c("yes" = "red", "no" = "black")) +
+  theme_pubr() +
+  xlab("Relative affinity (log10)") +
+  ylab("MPRA activity - Nutlin-3a induction") +
+  facet_wrap(~nn)
+```
+
+
+---
+
+## Does the spacer length between adjacent TP53 BSs impact MPRA activity?
+```{r}
+ggplot(RE_scores_aerts_design_activity_nBS %>%
+         filter(nn == 2, dif < 70),
+       aes(x = dif - 20, y = expression)) +
+  geom_point() +
+  geom_smooth(method = "loess") +
+  theme_pubr() +
+  xlab("BS-BS spacer length") +
+  ylab("MPRA activity - Nutlin-3a induction")
+```
+
+
+
+---
+
+### Session Info
+
+```{r}
+paste("Run time: ",format(Sys.time()-StartTime))
+getwd()
+date()
+sessionInfo()
+```
+
