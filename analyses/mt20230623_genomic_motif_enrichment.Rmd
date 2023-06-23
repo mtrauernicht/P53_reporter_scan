@@ -105,105 +105,8 @@ ReadFasta<-function(file) {
 ```
 
 
-### Extract all TSSs 
 
-Aim: Extract all sequences 500bp upstream of all TSSs in the human genome.
-```{r, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
-# Import selected TSSs from Christ, gencode.v27
-# Original location: DATA/scratch/usr/c.leemans/projects/meta_gene_plots/cl20200811_TSS_window_TOP_DRB/selection/
-tss_annotated <- read.delim2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/gencode.v27-fantom-selection.txt", header = F, col.names = c("chr", "TSS_position", "transcript_id", "strand", "gene_id", "expr_avg", "n_tissues"))
-
-# Select 500 bp window upstream of TSS
-tss_annotated$promoter_start <- 
-  ifelse(tss_annotated$strand == "+", tss_annotated$TSS_position - 499, tss_annotated$TSS_position + 499)
-
-# Save promoter_start as the lowest value
-tss_annotated$start <- pmin(tss_annotated$TSS_position, tss_annotated$promoter_start)
-tss_annotated$end <- pmax(tss_annotated$TSS_position, tss_annotated$promoter_start)
-tss_annotated$width <- 1 + (tss_annotated$end - tss_annotated$start)
-
-# Extract genomic sequence matching the selected promoter_start to TSS locations
-gr <- makeGRangesFromDataFrame(tss_annotated)
-
-tss_annotated$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg38::Hsapiens, names = gr, as.character = T)
-# # Save file
-# save(tss_annotated, file = "/DATA/usr/m.trauernicht/projects/SuRE_deep_scan_trp53_gr/data/p53_affinity_scoring/mt20210308_hg38_promoters-500bp.RData")
-```
-
-### Import scored TSSs
-
-Aim: The sequences extracted in the previous script were scanned using Chaitanya's P53 affinity model. Here, I will load those scored affinities.
-```{r, fig.width=10, fig.height=7, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
-# Import data
-load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/p53_tss_per_position.Rda")
-
-# # Put the scores of all TSSs into one large data frame - only keep the forward matching
-# tss_scores <- data.frame(matrix(ncol = 477, nrow = 1))
-# names(tss_scores) <- 1:477
-# 
-# count <- 0
-# for (i in unique(names(tss.per.pos$Scores))) {
-#   x <- data.frame(data.frame(tss.per.pos$Scores[i]))[1,]
-#   names(x) <- 1:ncol(x)
-#   tss_scores <- rbind(tss_scores, x)
-#   count <- count + length(i)
-#   print(count)
-# }
-# 
-# tss_scores <- tss_scores[-1,]
-# rownames(tss_scores) <- names(tss.per.pos$Scores)
-# tss_scores <- tss_scores %>%
-#   rownames_to_column(var = "transcript_id")
-load("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/mt20200309_tss_scored_affinity.RData")
-
-
-tss_scores <- merge(tss_annotated, tss_scores)
-
-tss_scores[, "max"] <- apply(tss_scores[, 13:489], 1, max)
-```
-
-
-
-### Import MCF7 RNA-seq gene list
-
-Aim: Match which TSSs are corresponding to genes that are upregulated upon Nutlin-3a treatment in MCF7 cells. I can then find out if those have (high-affinity) P53 BSs. 
-```{r mcf7_up_down_scoring, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
-# Import genes that are differentially expressed according to Aerts paper (Janky et al., iRegulon)
-geneSet1 <- read.delim2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/mcf7_nutlin_upregulated_GSE47041.txt",
-                        stringsAsFactors = F) %>%
-  mutate(nutlin = "upregulated")
-geneSet2 <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/mcf7_nutlin_downregulated.csv",
-                      stringsAsFactors = F) %>%
-  mutate(nutlin = "downregulated")
-
-# Annotate the tss data frame with the gene symbols
-# ensembl <- useMart("ensembl")
-# mart <- useDataset("hsapiens_gene_ensembl", mart = ensembl)
-# genes <- tss_scores$gene_id
-# genes <- gsub("[.].*","",genes)
-# G_list <- getBM(filters= "ensembl_gene_id", attributes= c("ensembl_gene_id","hgnc_symbol"),values=genes,mart= mart)
-# save(G_list, file = "/DATA/usr/m.trauernicht/data/gene_id_hgnc_converstion.RData")
-load("/DATA/usr/m.trauernicht/data/gene_id_hgnc_converstion.RData")
-G_list <- G_list %>% 
-  dplyr::select("genes" = hgnc_symbol, ensembl_gene_id)
-tss_scores$ensembl_gene_id <- gsub("[.].*","",tss_scores$gene_id)
-tss_scores <- merge(tss_scores, G_list, all = T)
-
-
-# Add up-or downregulated information to tss data frame
-tss_scores <- Reduce(function(x, y) merge(x, y, all = T, by = "genes"), list(tss_scores, geneSet1, geneSet2))
-tss_scores$nutlin.x[is.na(tss_scores$nutlin.x)] <- ""
-tss_scores$nutlin.y[is.na(tss_scores$nutlin.y)] <- ""
-tss_scores$nutlin <- paste(tss_scores$nutlin.x, tss_scores$nutlin.y, sep = "")
-tss_scores$nutlin[tss_scores$nutlin == ""] <- "unchanged"
-tss_scores <- tss_scores %>%
-  dplyr::select(-nutlin.x, -nutlin.y) %>% 
-  unique()
-```
-
-
-
-### Load the P53-reporter affinities
+### Load P53-reporter affinities
 
 Aim: Import affinity scores from my P53 reporter library.
 ```{r, fig.width=4, fig.height=4, fig.align= "center", echo=FALSE, warning= FALSE, message=FALSE}
@@ -246,7 +149,7 @@ nguyen_p53_REs$seq <- getSeq(BSgenome.Hsapiens.UCSC.hg19::Hsapiens, names = gr, 
 
 nguyen_p53_REs <- nguyen_p53_REs %>%
   mutate(name = paste("nguyen", gene, sep = "_")) %>%
-  dplyr::select(name, seq, chr, start)
+  dplyr::select(name, seq)
 
 
 # Curated list of P53 targets (Haran et al. 2018)
@@ -393,113 +296,118 @@ RE_scores[, "max"] <- apply(RE_scores[, 1:1502], 1, max, na.rm = T)
 ## Highlights: affinity scores of genomic P53-REs
 
 ```{r}
-p <- RE_scores_filt %>% filter(RE == "nguyen_CDKN1A") 
+RE_scores_filt <- RE_scores %>%
+  filter(max > 0.000025) %>%
+  pivot_longer(cols = c(-RE, -max), names_to = "position", values_to = "affinity") %>%
+  na.omit()
 
-ggplot(data = p, 
-       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
-           y = affinity)) +
-  geom_line() +
-  theme_bw() +
-  xlab("distance to RE center (bp)")+
-  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
-  ylab("affinity relative to perfect match")+
-  xlim(-50,50) +
-  ggtitle("P53 affinity across CDKN1A RE")
-
-
-p <- RE_scores_filt %>% filter(RE == "younger_chr7_121151311") 
-
-ggplot(data = p, 
-       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
-           y = affinity)) +
-  geom_line() +
-  theme_bw() +
-  xlab("distance to RE center (bp)")+
-  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
-  ylab("affinity relative to perfect match")+
-  ggtitle("P53 affinity across younger_chr7_121151311")
-
-p <- RE_scores_filt %>% filter(RE == "nguyen_GADD45A") 
-
-ggplot(data = p, 
-       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
-           y = affinity)) +
-  geom_line() +
-  theme_bw() +
-  xlab("distance to RE center (bp)")+
-  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
-  ylab("affinity relative to perfect match")+
-  xlim(-50,50) +
-  labs(title = "P53 affinity across GADD45A RE",
-       subtitle = "promega reporter & only 1 mismatch from consensus")
-
-
-p <- RE_scores_filt %>% filter(RE == "haran_MDM2_RE1")
-
-ggplot(data = p, 
-       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
-           y = affinity)) +
-  geom_line() +
-  theme_bw() +
-  xlab("distance to RE center (bp)")+
-  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
-  ylab("affinity relative to perfect match")+
-  xlim(-50,50) +
-  labs(title = "P53 affinity across MDM2 RE",
-       subtitle = "two adjacent binding sites")
-
-p <- RE_scores_filt %>% filter(RE == "nguyen_FOSL1")
-
-ggplot(data = p, 
-       aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
-           y = affinity)) +
-  geom_line() +
-  theme_bw() +
-  xlab("distance to RE center (bp)")+
-  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
-  ylab("affinity relative to perfect match")+
-  xlim(-50,50) +
-  labs(title = "P53 affinity across FOSL1 RE",
-       subtitle = "two adjacent binding sites")
-
-
-# Take the highest 20
-relevant <- c("aerts", "younger", "haran", "nguyen")
-p <- RE_scores_filt[grep(paste(relevant, collapse = "|"), RE_scores_filt$RE),] %>% 
-  arrange(desc(max)) %>% 
-  top_n(20)
-
-p <- RE_scores_filt[RE_scores_filt$RE %in% p$RE,]
-
-ggplot(data = p %>% 
-         arrange(desc(max)), 
-       aes(x = as.numeric(position), 
-           y = affinity)) +
-  geom_line() +
-  theme_bw() +
-  xlab("position (bp)")+
-  scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
-  ylab("affinity relative to perfect match")+
-  labs(title = "P53 affinity - highest matches") +
-  facet_wrap(~RE, scales = "free_x", ncol = 3)
-
-ggplot(data = p, 
-       aes(x = as.numeric(position), 
-           y = affinity,
-           color = RE)) +
-  geom_line() +
-  theme_bw() +
-  xlab("distance to RE center (bp)")+
-  ylab("affinity relative to perfect match")+
-  labs(title = "P53 affinity across FOSL1 RE",
-       subtitle = "two adjacent binding sites")
+# p <- RE_scores_filt %>% filter(RE == "nguyen_CDKN1A") 
+# 
+# ggplot(data = p, 
+#        aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+#            y = affinity)) +
+#   geom_line() +
+#   theme_bw() +
+#   xlab("distance to RE center (bp)")+
+#   scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+#   ylab("affinity relative to perfect match")+
+#   xlim(-50,50) +
+#   ggtitle("P53 affinity across CDKN1A RE")
+# 
+# 
+# p <- RE_scores_filt %>% filter(RE == "younger_chr7_121151311") 
+# 
+# ggplot(data = p, 
+#        aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+#            y = affinity)) +
+#   geom_line() +
+#   theme_bw() +
+#   xlab("distance to RE center (bp)")+
+#   scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+#   ylab("affinity relative to perfect match")+
+#   ggtitle("P53 affinity across younger_chr7_121151311")
+# 
+# p <- RE_scores_filt %>% filter(RE == "nguyen_GADD45A") 
+# 
+# ggplot(data = p, 
+#        aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+#            y = affinity)) +
+#   geom_line() +
+#   theme_bw() +
+#   xlab("distance to RE center (bp)")+
+#   scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+#   ylab("affinity relative to perfect match")+
+#   xlim(-50,50) +
+#   labs(title = "P53 affinity across GADD45A RE",
+#        subtitle = "promega reporter & only 1 mismatch from consensus")
+# 
+# 
+# p <- RE_scores_filt %>% filter(RE == "haran_MDM2_RE1")
+# 
+# ggplot(data = p, 
+#        aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+#            y = affinity)) +
+#   geom_line() +
+#   theme_bw() +
+#   xlab("distance to RE center (bp)")+
+#   scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+#   ylab("affinity relative to perfect match")+
+#   xlim(-50,50) +
+#   labs(title = "P53 affinity across MDM2 RE",
+#        subtitle = "two adjacent binding sites")
+# 
+# p <- RE_scores_filt %>% filter(RE == "nguyen_FOSL1")
+# 
+# ggplot(data = p, 
+#        aes(x = -((nrow(p)/2)-1):(nrow(p)/2), 
+#            y = affinity)) +
+#   geom_line() +
+#   theme_bw() +
+#   xlab("distance to RE center (bp)")+
+#   scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+#   ylab("affinity relative to perfect match")+
+#   xlim(-50,50) +
+#   labs(title = "P53 affinity across FOSL1 RE",
+#        subtitle = "two adjacent binding sites")
+# 
+# 
+# # Take the highest 20
+# relevant <- c("aerts", "younger", "haran", "nguyen")
+# p <- RE_scores_filt[grep(paste(relevant, collapse = "|"), RE_scores_filt$RE),] %>% 
+#   arrange(desc(max)) %>% 
+#   top_n(20)
+# 
+# p <- RE_scores_filt[RE_scores_filt$RE %in% p$RE,]
+# 
+# ggplot(data = p %>% 
+#          arrange(desc(max)), 
+#        aes(x = as.numeric(position), 
+#            y = affinity)) +
+#   geom_line() +
+#   theme_bw() +
+#   xlab("position (bp)")+
+#   scale_color_gradient(low = "#F9E9E4", high = "#DD6B48")+
+#   ylab("affinity relative to perfect match")+
+#   labs(title = "P53 affinity - highest matches") +
+#   facet_wrap(~RE, scales = "free_x", ncol = 3)
+# 
+# ggplot(data = p, 
+#        aes(x = as.numeric(position), 
+#            y = affinity,
+#            color = RE)) +
+#   geom_line() +
+#   theme_bw() +
+#   xlab("distance to RE center (bp)")+
+#   ylab("affinity relative to perfect match")+
+#   labs(title = "P53 affinity across FOSL1 RE",
+#        subtitle = "two adjacent binding sites")
 
 ```
 
 
 
 
-## Define a set of REs to focus on
+### Define a set of REs to focus on
 ```{r}
 ## Choose only sequences from Aerts paper
 RE_scores_aerts <- RE_scores %>%
@@ -507,19 +415,12 @@ RE_scores_aerts <- RE_scores %>%
   #filter(affinity >= 0.000025) %>%
   filter(str_detect(RE, "aerts"))
 
-reporter_scores_neg_ctrls <- reporter_scores %>%
-  filter(affinity_id == "1_null_only") %>%
-  dplyr::select(-neg_ctrls) %>%
-  pivot_longer(cols = c(-affinity_id, -reporter_id)) %>%
-  mutate(max = ave(value, reporter_id, FUN = function(x) max(x, na.rm = T))) %>%
-  distinct(reporter_id, max)
-
 ## Define set used for characterizing genomic TP53 BSs
-RE_scores_aerts_peak <- RE_scores_all %>%
+RE_scores_aerts_peak <- RE_scores_aerts %>%
   filter(str_detect(RE, "aerts_peak"))
 
 ## Define set with matched MPRA activities
-RE_scores_aerts_design <- RE_scores_all %>%
+RE_scores_aerts_design <- RE_scores_aerts %>%
   filter(str_detect(RE, "aerts_design"))
 ```
 
@@ -646,7 +547,7 @@ ggplot(RE_scores_aerts_peak_n_BS %>%
 
 ---
 
-## What is the relation between MPRA activity (or target gene expression) and TP53 BS affinity?
+## What is the relation between MPRA activity and TP53 BS affinity?
 ```{r}
 aerts_p53_REs_activity2 <- read.csv2("/DATA/usr/m.trauernicht/projects/P53_reporter_scan/data/p53_affinity_scoring/aerts_p53_activities2.csv") %>%
   dplyr::select("RE" = corresponding.peak.name, expression, padj)

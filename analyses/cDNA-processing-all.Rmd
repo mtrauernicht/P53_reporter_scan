@@ -1191,7 +1191,7 @@ cDNA_df_p53_nutlin <- cDNA_df_p53 %>% filter(stimulation == "Nutlin_mean")
 cDNA_df_p53_nutlin$row <- rownames(cDNA_df_p53_nutlin)
 
 ## Fitting the model
-x <- lm(log2(reporter_activity) ~  promoter*background + spacing_degree_transf + affinity_id, cDNA_df_p53_nutlin)
+x <- lm(log2(reporter_activity) ~  promoter*background + spacing_degree_transf*affinity_id, cDNA_df_p53_nutlin)
 
 summ(x)
 par(mfrow=c(2,2))
@@ -1223,7 +1223,7 @@ cDNA_df_p53_dmso$row <- rownames(cDNA_df_p53_dmso)
 
 
 ## Fitting the model
-y <- lm(log2(reporter_activity) ~  promoter*background + spacing_degree_transf + affinity_id, cDNA_df_p53_dmso)
+y <- lm(log2(reporter_activity) ~  promoter*background + spacing_degree_transf*affinity_id, cDNA_df_p53_dmso)
 
 summ(y)
 par(mfrow=c(2,2))
@@ -1269,6 +1269,21 @@ ggplot(cDNA_df_p53_all %>%
   theme(legend.position = "none") +
   facet_wrap(~stimulation, nrow = 2)
 
+ggplot(cDNA_df_p53_all %>%
+         distinct(stimulation, reporter_activity_predicted, affinity_pos1, reporter_id) %>%
+         pivot_wider(names_from = "stimulation", values_from = "reporter_activity_predicted"),
+       aes(x = DMSO_mean, y = Nutlin_mean, color = affinity_pos1
+           #, 
+           #color = top_6
+           )) +
+  geom_abline(lty = 2) +
+  geom_smooth(color = "black", method = "lm") +
+  geom_point(size = 2) +
+  scale_color_manual(values = c("BS100" = "#DC6641", "BS037" = "#E99D86", "BS014" = "#EDBBAB", "BS006" = "#F7E4DE")) +
+  xlab("Measured reporter activity") +
+  ylab("Predicted reporter activity") +
+  theme(legend.position = "none") 
+
 level_order <- c("spacing_degree_transf", "1_high_only", "3_med_only", "5_low_only", "7_very-low_only", 
                      "promoterminP", "promotermCMV", "background1", "background2", "background3", "promotermCMV:background2", "promotermCMV:background3")
 
@@ -1287,6 +1302,66 @@ ggplot(weight %>%
 ```
 
 Conlusion: Top reporters are better than commercial reporters. Linear model gives insights into which features are important to drive high expression.
+
+
+## Linear model parameter sweep to systematically identify best reporters
+```{r}
+## Nutlin condition
+cDNA_df_p53_nutlin <- cDNA_df_p53 %>% filter(stimulation == "Nutlin_mean")
+
+cDNA_df_p53_nutlin$row <- rownames(cDNA_df_p53_nutlin)
+
+## Fitting the model
+x <- lm(log2(reporter_activity) ~  promoter*background*spacing_degree_transf*affinity_id, cDNA_df_p53_nutlin)
+
+summ(x)
+par(mfrow=c(2,2))
+plot(x)
+
+# Get predicted activities per reporter
+y <- data.frame(x$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(y) <- c("row", "reporter_activity_predicted")
+y$id <- 1:nrow(y)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53_nutlin)), stringsAsFactors=FALSE)
+prediction <- merge(prediction,y, all = T) %>% 
+  dplyr::select(-id)
+cDNA_df_p53_nutlin <- merge(cDNA_df_p53_nutlin, prediction) %>%
+  distinct(reporter_id, reporter_activity_predicted, stimulation)
+  
+
+## DMSO condition
+cDNA_df_p53_dmso <- cDNA_df_p53 %>% filter(stimulation == "DMSO_mean")
+
+cDNA_df_p53_dmso$row <- rownames(cDNA_df_p53_dmso)
+
+
+## Fitting the model
+y <- lm(log2(reporter_activity) ~  promoter*background*spacing_degree_transf*affinity_id, cDNA_df_p53_dmso)
+
+summ(y)
+par(mfrow=c(2,2))
+plot(y)
+
+# Get predicted activities per reporter
+y_dmso <- data.frame(y$fitted.values, stringsAsFactors=FALSE) %>% rownames_to_column()
+names(y_dmso) <- c("row", "reporter_activity_predicted")
+y_dmso$id <- 1:nrow(y_dmso)
+prediction <- data.frame("id" = 1:(nrow(cDNA_df_p53_dmso)), stringsAsFactors=FALSE)
+prediction <- merge(prediction,y_dmso, all = T) %>% 
+  dplyr::select(-id)
+cDNA_df_p53_dmso <- merge(cDNA_df_p53_dmso, prediction) %>%
+  distinct(reporter_id, reporter_activity_predicted, stimulation)
+
+cDNA_df_p53_all <- rbind(cDNA_df_p53_dmso, cDNA_df_p53_nutlin)
+
+cDNA_df_p53_all_wide <- cDNA_df_p53_all %>%
+  pivot_wider(names_from = "stimulation", values_from = "reporter_activity_predicted")
+
+ggplot(cDNA_df_p53_all_wide,
+       aes(x = DMSO_mean, y = Nutlin_mean)) +
+  geom_point()
+
+```
 
 
 # Session Info
