@@ -102,6 +102,14 @@ ReadFasta<-function(file) {
    # Return the data frame as a result object from the function
    return(DF)
 }
+
+theme_classic_lines <- function() {
+  theme_pubr(border = T,  legend = "top") +
+            theme(panel.grid.major = element_line(colour = "#adb5bd", size = 0.1),
+                  strip.background = element_rect(fill = "#ced4da"))
+    
+}
+theme_set(theme_classic_lines())
 ```
 
 
@@ -436,13 +444,13 @@ ggplot(RE_scores_aerts_peak_max %>%
          mutate(rank = rank(-max)) %>%
          filter(rank < 250),
        aes(x = "", y = max)) +
-  geom_hline(yintercept = 1, lty = 3, color = "red") +
-  geom_hline(yintercept = 0.3708171, lty = 3, color = "red") +
+  #geom_hline(yintercept = 1, lty = 3, color = "red") +
+  #geom_hline(yintercept = 0.3708171, lty = 3, color = "red") +
   geom_hline(yintercept = 0.1382304, lty = 3, color = "red") +
   geom_hline(yintercept = 0.05752735, lty = 3, color = "red") +
   #geom_hline(yintercept = 0.004223629, lty = 3, color = "blue") +
-  geom_quasirandom() +
-  theme_pubr() +
+  geom_quasirandom(alpha = .4) +
+  theme_pubr(border = T) +
   xlab("Top 250 TP53 REs") +
   ylab("Relative affinity")
 
@@ -510,9 +518,9 @@ RE_scores_aerts_peak_n_BS <- RE_scores_aerts_peak_n_BS %>%
 
 
 ggplot(RE_scores_aerts_peak_n_BS,
-       aes(x = nn)) +
+       aes(x = as.factor(nn))) +
   geom_bar(stat = "count") +
-  theme_pubr() +
+  theme_pubr(border = T) +
   xlab("Number of BSs")
 
 ggplot(RE_scores_aerts_peak_n_BS %>%
@@ -532,7 +540,7 @@ ggplot(RE_scores_aerts_peak_n_BS %>%
          distinct(RE, dif),
        aes(x = dif - 20)) +
   geom_bar(stat = "count") +
-  theme_pubr() +
+  theme_pubr(border = T) +
   xlab("BS-BS spacer length")
 
 ggplot(RE_scores_aerts_peak_n_BS %>%
