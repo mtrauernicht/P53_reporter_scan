@@ -1,8 +1,8 @@
 
 
-# Systematic analysis of transcriptional activation from synthetic TP53 binding sites
-  
+# Optimisation of TP53 reporters by systematic dissection of synthetic TP53 response elements
 
+  
 [![DOI](https://zenodo.org/badge/298230427.svg)](https://zenodo.org/badge/latestdoi/298230427)
 
 **Introduction:**
@@ -42,7 +42,7 @@ ___
 
 **Repository guide:**
 
-- analysis folder: pre-processing of the barcode counts (barcode-preprocessing.Rmd) + analysis of barcode counts, linear modeling, figure generation (cDNA-processing.Rmd)
+- analysis folder: pre-processing of the barcode counts (barcode-preprocessing.Rmd) + analysis of barcode counts, linear modeling, figure generation (cDNA-processing.Rmd) + analysis of genomic TP53 response elements (mt20230623_genomic_motif_enrichment.Rmd)
 - library_design folder: contains script that was used to generate the TP53 reporter sequences
 - pDNA_insert_seq folder: contains scripts to analyze the full-length sequences of the plasmid pool that was used for transfections
 - raw_data_analysis folder: contains the scripts that were used to extract and cluster the raw barcode counts
